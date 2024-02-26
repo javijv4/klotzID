@@ -3,7 +3,7 @@
 !SetOutputPath={#outdir}
 
 #st=1
-#et=10
+#et=100
 #dt=0.01
 
 !include={mesh/mesh_info.P}
