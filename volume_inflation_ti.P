@@ -46,9 +46,9 @@
 
 
 % --- Variables ------------------------------------------------------
-!DefVariablePointer={Space| TP1 | #meshdir/lv_model | 3}
-!DefVariablePointer={SpaceO| TP1 | #meshdir/lv_model | 3}
-!DefVariablePointer={Disp| TP1 | 3}
+!DefVariablePointer={Space| TP2 | #meshdir/lv_model_quad | 3}
+!DefVariablePointer={SpaceO| TP2 | #meshdir/lv_model_quad | 3}
+!DefVariablePointer={Disp| TP2 | 3}
 !DefVariablePointer={Pres| TP1 | 1}
 !DefVariablePointer={Fibers| TP2 |#datadir/fiber60.field|9}
 
@@ -60,14 +60,13 @@
 
 % --- Expressions ------------------------------------------------------
 !DefExpression={mat_params_expr}
-  0.61*#k
-  7.5*#kb
-  1.56*#k
-  35.31*#kb
-  0.
-  0.
-  0.
-  0.
+  0.88*#k
+  18.5*#kb
+  1.63*#kb
+  1.63*#kb
+  3.58*#kb
+  3.58*#kb
+  3.58*#kb
 
 %  ---  Problem Definition  --------------------------------------------
 !DefProblem={solid|STEADY_QUASI_STATIC_ELASTICITY}
@@ -79,7 +78,7 @@
   !Density{1.0e-6}
 
 % --- Active/passive laws ---------------------------------------------
-  !ConstitutiveLaw={holzapfel-ogden}
+  !ConstitutiveLaw={orthofiber-classic}
     mat_params_expr
   !Nearly-Incompressible={100}
 

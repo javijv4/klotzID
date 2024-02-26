@@ -1,0 +1,92 @@
+#meshdir = mesh
+#datadir = data
+!SetOutputPath={#outdir}
+
+#st=1
+#et=100
+#dt=0.01
+
+!include={mesh/mesh_info.P}
+
+#EDV=131153.376791549788322
+
+% --- Solver Definition ----------------------------------------------
+!DefSolverGroup={SG1|TimeStepping|Matrix}
+  !DefSolverSubGroup={SG1|SEQ_FP_LINESEARCH|Matrix|ScaleFirstResidual[1000]}
+  !SetSolverGroup={SG1|L2TOL|1e-8}
+  !SetSolverGroup={SG1|ITERATION|30}
+  !SetSolverGroup={SG1|LINESEARCHITER|10}
+
+!DefSolverMatrix={Matrix|SOLVER_MUMPS|solid|lvendo|constraint_base|constraint_com}
+  !SetSolverMatrix={Matrix |ordering      |parallel}
+  !SetSolverMatrix={Matrix | SolverMatrixCalculation | evaluate_every_build}
+
+!DefTimeStepScheme={TimeStepping}
+   #st   #et   #dt
+
+% --- Basis function definition --------------------------------------
+!UseBasis={QuadBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE2|KEAST_LYNESS4}
+!UseBasis={LinBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS4}
+!UseBasis={ConstBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE0|KEAST_LYNESS4}
+!UseBasis={QuadSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE2|KEAST_LYNESS4}
+!UseBasis={LinSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS4}
+!UseBasis={ConstSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE0|KEAST_LYNESS4}
+
+% --- Topology -------------------------------------------------------
+!DefTopology={TP1 | #meshdir/lv_model | LinBasis}
+!DefTopology={TP2 | #meshdir/lv_model_quad | QuadBasis}
+!DefTopology={TP0d | #meshdir/lv_model_disc  | ConstBasis}
+  !SetTopology={TP0d|MakeDiscontinuous}
+!DefTopology={TP1d | #meshdir/lv_model_disc1 | LinBasis}
+  !SetTopology={TP1d|MakeDiscontinuous}
+
+
+% --- Interfaces -----------------------------------------------------
+!DefInterface={OneToOne|TP2|TP1|TP0d|TP1d}
+
+
+% --- Variables ------------------------------------------------------
+!DefVariablePointer={Space| TP2 | #meshdir/lv_model_quad | 3}
+!DefVariablePointer={SpaceO| TP2 | #meshdir/lv_model_quad | 3}
+!DefVariablePointer={Disp| TP2 | 3}
+!DefVariablePointer={Pres| TP1 | 1}
+!DefVariablePointer={Fibers| TP2 |#datadir/fiber60.field|9}
+
+
+% --- Other ------------------------------------------------------------
+!SetExportFrequency={Disp|Pres|10}
+!SetExportFrequency={Space|SpaceO|Fibers|-1}
+
+
+% --- Expressions ------------------------------------------------------
+!DefExpression={mat_params_expr}
+  0.61*#k
+  7.5*#kb
+  1.56*#k
+  35.31*#kb
+  0.
+  0.
+  0.
+  0.
+
+%  ---  Problem Definition  --------------------------------------------
+!DefProblem={solid|STEADY_QUASI_STATIC_ELASTICITY}
+  !UseVariablePointer={Space|Space}
+  !UseVariablePointer={Displacement|Disp}
+  !UseVariablePointer={Pressure|Pres}
+  !UseVariablePointer={Fibers|Fibers}
+  !SetRootTopology={TP2}
+  !Density{1.0e-6}
+
+% --- Active/passive laws ---------------------------------------------
+  !ConstitutiveLaw={holzapfel-ogden}
+    mat_params_expr
+  !Nearly-Incompressible={100}
+
+  % --- Boundary conditions --------------------------------------------
+  !Boundary-patch-definitions
+    2  Disp.3  DIRICHLET 0.
+
+% --- Problems ------------------------------------------------------
+!include={problem_volume.P}
+!include={problem_base.P}

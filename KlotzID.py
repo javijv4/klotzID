@@ -17,13 +17,14 @@ import time
 
 
 class KlotzID:
-    def __init__(self, out_fldr, pressure_var, volume_var, sim_times, ed_pressure, ed_volume, inflation_type, ncores, plot_intermediate=False):
+    def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, ed_pressure, ed_volume, inflation_type, ncores, plot_intermediate=False):
         self.ncores = ncores
         self.inflation_type = inflation_type
+        self.pfile = pfile
 
         # Output path
         self.out_fldr = out_fldr
-        if not os.path.exists('out_fldr'): os.mkdir('out_fldr')
+        if not os.path.exists(out_fldr): os.mkdir(out_fldr)
 
         self.pressure_var = pressure_var
         self.volume_var = volume_var
@@ -70,7 +71,7 @@ class KlotzID:
 
 
     def optimize(self, params):
-        self.preclean()
+        self.pre_clean()
 
         # Initializing variables
         error = 1e3
@@ -149,7 +150,6 @@ class KlotzID:
 
         # Update lam
         gnorm = np.linalg.norm(g)
-        print(gnorm)
         if self.it > 0:
             if gnorm < self.gnorm:
                 self.lam *= gnorm/self.gnorm
@@ -198,7 +198,7 @@ class KlotzID:
 
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
-            p = Popen(['bash', 'run_inflation.sh', '{:f}'.format(k), '{:f}'.format(kb), outdir, '{:d}'.format(self.ncores)], stdout=ofile, stderr=ofile)
+            p = Popen(['bash', 'run_inflation.sh', '{:f}'.format(k), '{:f}'.format(kb), outdir, '{:d}'.format(self.ncores), self.pfile], stdout=ofile, stderr=ofile)
 
         return p
     
