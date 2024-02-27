@@ -90,8 +90,6 @@ class KlotzID:
             end_time = time.time()
             print('Optimization succesful in {:d} iterations and {:2.3f} s'.format(self.it, end_time-start_time))
             print('Parameters found are k={:f} and kb={:f}'.format(params[0], params[1]))
-            self.write_params(params)
-            self.run_last_simulation(params)
         else:
             print('Optimization failed.')
 
@@ -121,7 +119,7 @@ class KlotzID:
         pres_eps = pres_eps*self.ed_pressure/pres_eps[-1]
 
         if self.plot_intermediate:
-            self.plot_inflation_curve(vol, pres)
+            self.plot_inflation_curve('{}/klotz_it{:d}.png'.format(self.out_fldr, self.it), vol, pres)
 
         # Levenber-marquadt iteration
         pres_klotz = self.klotz_function(vol)
@@ -163,7 +161,7 @@ class KlotzID:
         return delta[0]
     
 
-    def run_last_simulation(self, params):
+    def run_last_simulation(self, params, plot=True):
         print('Running simulation with optimized parameters')
         p1 = self.run_cheart_inflation(params, self.out_fldr)
         p1.wait()
@@ -177,6 +175,8 @@ class KlotzID:
         g = pres_klotz-pres
         curve_error = np.linalg.norm(g)
 
+        if plot:
+            self.plot_inflation_curve('{}/klotz_fit.png'.format(self.out_fldr, self.it), vol, pres)
         print('Final simulation results: ED error = {:f}, curve error {:f}'.format(ed_error, curve_error))
 
 
@@ -186,10 +186,11 @@ class KlotzID:
             file.write("Iteration {:d}, k={:f}, kb={:f}, error = {:e}\n".format(self.it, params[0], params[1], error))
 
 
-    def write_params(self, params):
-        with open('optimized_params.P', "w") as file:
+    @staticmethod
+    def write_params(fname, params):
+        with open(fname, "w") as file:
             # Writing data to a file
-            file.write("#k={:f}".format(params[0]))
+            file.write("#k={:f}\n".format(params[0]))
             file.write("#kb={:f}".format(params[1]))
 
 
@@ -203,13 +204,13 @@ class KlotzID:
         return p
     
 
-    def plot_inflation_curve(self, volume, pressure):
+    def plot_inflation_curve(self, fname, volume, pressure):
         plt.figure(1, clear=True)
         plt.plot(volume/1000, self.klotz_function(volume)*7.50062, 'k', label='klotz')
         plt.plot(volume/1000, pressure*7.50062, 'r', label='it={:d}'.format(self.it))
         plt.xlabel('Volume [ml]')
         plt.ylabel('Pressure [kPa]')
-        plt.savefig('{}/klotz_it{:d}.png'.format(self.out_fldr, self.it), bbox_inches='tight')
+        plt.savefig(fname, bbox_inches='tight')
 
 
 

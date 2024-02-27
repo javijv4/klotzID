@@ -26,7 +26,9 @@ k0 = 1.0
 kb0 = 1.0
 params0 = (k0, kb0)
 
-klotzopt = KlotzID(pfile, pressure_var, volume_var, out_fldr, times, ed_pressure, ed_volume, inflation_type, ncores)
+klotzopt = KlotzID(pfile, pressure_var, volume_var, out_fldr, times, ed_pressure, ed_volume, inflation_type, ncores, plot_intermediate=True)
 klotzopt.max_iterations = 20
 params = klotzopt.optimize(params0)
 
+klotzopt.run_last_simulation(params)
+klotzopt.write_params('optimize_params_ve.P', params)
