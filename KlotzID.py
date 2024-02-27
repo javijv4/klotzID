@@ -18,9 +18,10 @@ import time
 
 class KlotzID:
     def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, ed_pressure, ed_volume, inflation_type, ncores, plot_intermediate=False):
+        self.cheart_folder = os.path.dirname(pfile)
         self.ncores = ncores
         self.inflation_type = inflation_type
-        self.pfile = pfile
+        self.pfile = os.path.basename(pfile)
 
         # Output path
         self.out_fldr = out_fldr
@@ -52,8 +53,10 @@ class KlotzID:
 
     def pre_clean(self):
         # Creating folders
-        if not os.path.exists('tmp1'): os.mkdir('tmp1')
-        if not os.path.exists('tmp2'): os.mkdir('tmp2')
+        if not os.path.exists('{}/tmp1'.format(self.cheart_folder)): 
+            os.mkdir('{}/tmp1'.format(self.cheart_folder))
+        if not os.path.exists('{}/tmp2'.format(self.cheart_folder)): 
+            os.mkdir('{}/tmp2'.format(self.cheart_folder))
 
         # Deleting log
         try:
@@ -64,8 +67,8 @@ class KlotzID:
 
     def post_clean(self):
         # Deleting temporaty folders.
-        shutil.rmtree('tmp1/')
-        shutil.rmtree('tmp2/')
+        shutil.rmtree('{}/tmp1'.format(self.cheart_folder))
+        shutil.rmtree('{}/tmp2'.format(self.cheart_folder))
         os.remove('tmp1.log')
         os.remove('tmp2.log')
 
@@ -105,9 +108,9 @@ class KlotzID:
         exit_codes = [p.wait() for p in (p1, p2)]
 
         # Load results
-        pres = chio.read_scalar_dfiles('{}/{}'.format('tmp1', self.pressure_var), self.times)
-        vol = chio.read_scalar_dfiles('{}/{}'.format('tmp1', self.volume_var), self.times)
-        pres_eps = chio.read_scalar_dfiles('{}/{}'.format('tmp2', self.pressure_var), self.times)
+        pres = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp1', self.pressure_var), self.times)
+        vol = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp1', self.volume_var), self.times)
+        pres_eps = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp2', self.pressure_var), self.times)
         
         # Parameter update
         k, kb = params
@@ -167,8 +170,8 @@ class KlotzID:
         p1.wait()
 
         # Load results
-        pres = chio.read_scalar_dfiles('{}/{}'.format(self.out_fldr, self.pressure_var), self.times)
-        vol = chio.read_scalar_dfiles('{}/{}'.format(self.out_fldr, self.volume_var), self.times)
+        pres = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, self.out_fldr, self.pressure_var), self.times)
+        vol = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, self.out_fldr, self.volume_var), self.times)
         ed_error = np.abs(self.ed_pressure/pres[-1]-1)
 
         pres_klotz = self.klotz_function(vol)
@@ -190,8 +193,8 @@ class KlotzID:
     def write_params(fname, params):
         with open(fname, "w") as file:
             # Writing data to a file
-            file.write("#k={:f}\n".format(params[0]))
-            file.write("#kb={:f}".format(params[1]))
+            file.write("#k={:12.12f}\n".format(params[0]))
+            file.write("#kb={:12.12f}".format(params[1]))
 
 
     def run_cheart_inflation(self, params, outdir):
@@ -199,7 +202,9 @@ class KlotzID:
 
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
-            p = Popen(['bash', 'run_inflation.sh', '{:f}'.format(k), '{:f}'.format(kb), outdir, '{:d}'.format(self.ncores), self.pfile], stdout=ofile, stderr=ofile)
+            p = Popen(['bash', 'run_inflation.sh', '{:f}'.format(k), '{:f}'.format(kb), 
+                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile], 
+                       stdout=ofile, stderr=ofile)
 
         return p
     
