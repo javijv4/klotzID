@@ -11,6 +11,7 @@ from KlotzID import KlotzID
 
 ncores = 5   # WARNING!!! The program uses ncores x 2 cores.
 out_fldr = 'out_mh'
+out_fname = 'optimize_params_ve.P'
 inflation_type = 'volume'
 pfile = 'volume_inflation_ve.P'
 
@@ -31,4 +32,4 @@ klotzopt.max_iterations = 20
 params = klotzopt.optimize(params0)
 
 klotzopt.run_last_simulation(params)
-klotzopt.write_params('optimize_params_ve.P', params)
+klotzopt.write_params(out_fname, params)
