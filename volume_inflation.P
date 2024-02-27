@@ -46,9 +46,9 @@
 
 
 % --- Variables ------------------------------------------------------
-!DefVariablePointer={Space| TP2 | #meshdir/lv_model_quad | 3}
-!DefVariablePointer={SpaceO| TP2 | #meshdir/lv_model_quad | 3}
-!DefVariablePointer={Disp| TP2 | 3}
+!DefVariablePointer={Space| TP1 | #meshdir/lv_model | 3}
+!DefVariablePointer={SpaceO| TP1 | #meshdir/lv_model | 3}
+!DefVariablePointer={Disp| TP1 | 3}
 !DefVariablePointer={Pres| TP1 | 1}
 !DefVariablePointer={Fibers| TP2 |#datadir/fiber60.field|9}
 

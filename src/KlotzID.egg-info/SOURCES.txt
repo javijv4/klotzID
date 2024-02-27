@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+src/KlotzID.py
+src/KlotzID.egg-info/PKG-INFO
+src/KlotzID.egg-info/SOURCES.txt
+src/KlotzID.egg-info/dependency_links.txt
+src/KlotzID.egg-info/requires.txt
+src/KlotzID.egg-info/top_level.txt

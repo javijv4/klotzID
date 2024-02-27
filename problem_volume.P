@@ -1,0 +1,53 @@
+% --- Solver Options ----------------------------------------------
+!SetSolverGroup={SG1|AddVariables|LV_Vol}
+
+
+% --- Topology -------------------------------------------------------
+% For LM
+!DefTopology={TP2endo | #meshdir/lv_model_quad_endo  | QuadSurfBasis}
+  !SetTopology={TP2endo|CreateInBoundary|[TP2;#endo]}
+
+
+% --- Interfaces -----------------------------------------------------
+!DefInterface={ManyToOne|TP2endo|TP2|#meshdir/TP2endo-TP2_solid.IN|NestedInBndry[#endo]}
+
+
+% --- Variables ------------------------------------------------------
+!DefVariablePointer={LV_LM|null_topology|1}
+
+!DefVariablePointer={LV_Vol|null_topology|1}
+  !SetVariablePointer={LV_Vol|TEMPORAL_UPDATE_EXPR|LV_Vol_expr|1}
+
+!SetExportFrequency={LV_LM|LV_Vol|1}
+
+
+% --- Expressions ------------------------------------------------------
+!DefExpression={LV_Vol_expr}
+  (#EDV - #V0)*t + #V0
+
+!DefExpression={base_normal}
+  0.
+  0.
+  1.
+
+% Expression to calculate the volume in this region
+!DefExpression={mat_expr_lv}
+  0.5 * (1 - base_normal.1 * base_normal.1)
+  0.5 * (0 - base_normal.1 * base_normal.2)
+  0.5 * (0 - base_normal.1 * base_normal.3)
+  0.5 * (0 - base_normal.2 * base_normal.1)
+  0.5 * (1 - base_normal.2 * base_normal.2)
+  0.5 * (0 - base_normal.2 * base_normal.3)
+  0.5 * (0 - base_normal.3 * base_normal.1)
+  0.5 * (0 - base_normal.3 * base_normal.2)
+  0.5 * (1 - base_normal.3 * base_normal.3)
+
+% ----  Volume constrain (LV) ---------------------------------------------------------
+!DefProblem={lvendo|fscoupling_problem}
+  !UseVariablePointer={Space|Space}
+  !AddTerms={TestVariable[Disp]| LV_LM[trace]}
+  !Addterms
+     TestVariable[LV_LM*]
+     Disp[trace;mat_expr_lv]  Space[trace;mat_expr_lv]   LV_Vol_expr[1;flux]
+  !Boundary-conditions-not-required
+  !SetRootTopology={TP2endo}

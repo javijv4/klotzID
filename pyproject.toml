@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "KlotzID"
+version = "0.0.0"
+authors = [
+  { name="Javiera Jilberto", email="jilberto@umich.edu" },
+]
+description = "Python-Cheart codes to find the parameters that fit the Klotz curve"
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "scipy",
+  "meshio"
+]

@@ -18,14 +18,17 @@ import time
 
 class KlotzID:
     def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, ed_pressure, ed_volume, inflation_type, ncores, plot_intermediate=False):
+        self.self_path = os.path.dirname(os.path.abspath(__file__))
         self.cheart_folder = os.path.dirname(pfile)
+        if self.cheart_folder == '': self.cheart_folder = '.'
         self.ncores = ncores
         self.inflation_type = inflation_type
         self.pfile = os.path.basename(pfile)
 
         # Output path
         self.out_fldr = out_fldr
-        if not os.path.exists(out_fldr): os.mkdir(out_fldr)
+        if not os.path.exists('{}/{}'.format(self.cheart_folder, out_fldr)): 
+            os.mkdir('{}/{}'.format(self.cheart_folder, out_fldr))
 
         self.pressure_var = pressure_var
         self.volume_var = volume_var
@@ -73,7 +76,7 @@ class KlotzID:
         os.remove('tmp2.log')
 
 
-    def optimize(self, params):
+    def optimize(self, params, post_clean=False):
         self.pre_clean()
 
         # Initializing variables
@@ -96,7 +99,8 @@ class KlotzID:
         else:
             print('Optimization failed.')
 
-        self.post_clean()
+        if post_clean:
+            self.post_clean()
         return params
 
 
@@ -122,7 +126,7 @@ class KlotzID:
         pres_eps = pres_eps*self.ed_pressure/pres_eps[-1]
 
         if self.plot_intermediate:
-            self.plot_inflation_curve('{}/klotz_it{:d}.png'.format(self.out_fldr, self.it), vol, pres)
+            self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.cheart_folder, self.out_fldr, self.it), vol, pres)
 
         # Levenber-marquadt iteration
         pres_klotz = self.klotz_function(vol)
@@ -179,7 +183,7 @@ class KlotzID:
         curve_error = np.linalg.norm(g)
 
         if plot:
-            self.plot_inflation_curve('{}/klotz_fit.png'.format(self.out_fldr, self.it), vol, pres)
+            self.plot_inflation_curve('{}/{}/klotz_fit.png'.format(self.cheart_folder, self.out_fldr), vol, pres)
         print('Final simulation results: ED error = {:f}, curve error {:f}'.format(ed_error, curve_error))
 
 
@@ -202,7 +206,7 @@ class KlotzID:
 
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
-            p = Popen(['bash', 'run_inflation.sh', '{:f}'.format(k), '{:f}'.format(kb), 
+            p = Popen(['bash', '{}/run_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb), 
                        outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile], 
                        stdout=ofile, stderr=ofile)
 
