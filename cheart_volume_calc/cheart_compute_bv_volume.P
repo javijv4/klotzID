@@ -3,7 +3,7 @@
 % The result should be similar as creating a cap in the valves and computing the
 % enclosed volume.
 
-!include={../mesh/boundaries.P}
+!include={boundaries.P}
 % --- Solver Definition ----------------------------------------------
 !DefSolverGroup={INFLATION|null|lv_vol_calc|rv_vol_calc}
 !DefSolverSubGroup={INFLATION|SOLVER_SEQUENTIAL|lv_vol_calc|rv_vol_calc}
@@ -23,6 +23,7 @@
 
 % --- Variables ------------------------------------------------------
 !DefVariablePointer={Space| TP2 | #meshdir/bv_model_quad | 3}
+!DefVariablePointer={Space0| TP1 | #meshdir/bv_model | 3}
 
 !DefVariablePointer={N3_LV | null_topology | #meshdir/N3_lv.FE | 3}
 !DefVariablePointer={N3_RV | null_topology | #meshdir/N3_rv.FE | 3}

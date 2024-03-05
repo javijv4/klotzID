@@ -40,7 +40,7 @@ def klotz_v0(lv_volume, lv_pressure):  # in mm3, KPa
 
 
 
-mesh_fldr = '../mesh/'
+mesh_fldr = '../work/test_fine/mesh/'
 lv_pressure = 1.33
 rv_pressure = 0.4
 lv_volume, rv_volume = run_cheart_volume_compute(mesh_fldr)

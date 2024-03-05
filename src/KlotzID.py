@@ -39,7 +39,7 @@ class KlotzID:
         self.ed_pressure = ed_pressure  # kPa
         self.ed_volume = ed_volume # mm3
         self.klotz_volume, self.klotz_pressure = klotz_curve(ed_volume, ed_pressure)
-        self.klotz_function = interp1d(self.klotz_volume, self.klotz_pressure)
+        self.klotz_function = interp1d(self.klotz_volume, self.klotz_pressure, fill_value='extrapolate')
 
         # Optimization parameters
         self.eps = 1e-2

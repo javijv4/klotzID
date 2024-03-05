@@ -1,0 +1,23 @@
+% This file computes the volume using a N3 vector, i.e the cross product of the
+% valve normals.
+% The result should be similar as creating a cap in the valves and computing the
+% enclosed volume.
+
+!include={boundaries.P}
+
+% --- Basis function definition --------------------------------------
+!UseBasis={LinBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS6}
+!UseBasis={QuadBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE2|KEAST_LYNESS6}
+!UseBasis={LinSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS6}
+!UseBasis={ConstSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE0|KEAST_LYNESS6}
+
+% --- Topology -------------------------------------------------------
+!DefTopology={TP1 | #meshdir/bv_model | LinBasis}
+!DefTopology={TP2 | #meshdir/bv_model_quad | QuadBasis}
+
+% -- Interfaces -----------------------------------------------------
+!DefInterface={OneToOne|TP1|TP2}
+
+% --- Variables ------------------------------------------------------
+!DefVariablePointer={Space| TP2 | #meshdir/bv_model_quad | 3}
+!DefVariablePointer={Space0| TP1 | #meshdir/bv_model | 3}
