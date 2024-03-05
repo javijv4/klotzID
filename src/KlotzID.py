@@ -27,7 +27,7 @@ class KlotzID:
 
         # Output path
         self.out_fldr = out_fldr
-        if not os.path.exists('{}/{}'.format(self.cheart_folder, out_fldr)): 
+        if not os.path.exists('{}/{}'.format(self.cheart_folder, out_fldr)):
             os.mkdir('{}/{}'.format(self.cheart_folder, out_fldr))
 
         self.pressure_var = pressure_var
@@ -56,9 +56,9 @@ class KlotzID:
 
     def pre_clean(self):
         # Creating folders
-        if not os.path.exists('{}/tmp1'.format(self.cheart_folder)): 
+        if not os.path.exists('{}/tmp1'.format(self.cheart_folder)):
             os.mkdir('{}/tmp1'.format(self.cheart_folder))
-        if not os.path.exists('{}/tmp2'.format(self.cheart_folder)): 
+        if not os.path.exists('{}/tmp2'.format(self.cheart_folder)):
             os.mkdir('{}/tmp2'.format(self.cheart_folder))
 
         # Deleting log
@@ -84,7 +84,7 @@ class KlotzID:
         self.it = 0
         start_time = time.time()
         while (error > 1e-3) and (self.it < self.max_iterations):
-            new_params, error = self.optimize_iteration(params)
+            new_params, error = self.optimize_iteration_volume(params)
 
             self.write_log(params, error)
 
@@ -104,7 +104,7 @@ class KlotzID:
         return params
 
 
-    def optimize_iteration(self, params):
+    def optimize_iteration_volume(self, params):
         k, kb = params
 
         p1 = self.run_cheart_inflation((k, kb), 'tmp1')
@@ -115,10 +115,16 @@ class KlotzID:
         pres = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp1', self.pressure_var), self.times)
         vol = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp1', self.volume_var), self.times)
         pres_eps = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp2', self.pressure_var), self.times)
-        
+
+        if self.inflation_type == 'inverse_volume':
+            vol = vol[::-1]
+            vol = np.append(vol, self.ed_volume)
+            pres = np.append(0., pres)
+            pres_eps = np.append(0., pres_eps)
+
         # Parameter update
         k, kb = params
-        
+
         # Linear correction
         k_delta = self.ed_pressure/pres[-1]
         k = k*k_delta
@@ -129,19 +135,18 @@ class KlotzID:
             self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.cheart_folder, self.out_fldr, self.it), vol, pres)
 
         # Levenber-marquadt iteration
-        pres_klotz = self.klotz_function(vol)
-        g = pres_klotz-pres
+        g = self.compute_curve_difference(vol, pres)
         kb_delta = self.LM_update(g, pres, pres_eps)
         kb += kb_delta
 
-        # Compute error 
+        # Compute error
         error = np.abs(kb_delta) + np.abs(k_delta-1)
 
         # Return new parameters
         params = (k, kb)
         return params, error
 
-    
+
     def LM_update(self, g, pres, pres_eps):
         # Compute jacobian (forward differences)
         J = (pres_eps - pres)/self.eps
@@ -166,7 +171,7 @@ class KlotzID:
         self.gnorm = gnorm
 
         return delta[0]
-    
+
 
     def run_last_simulation(self, params, plot=True):
         print('Running simulation with optimized parameters')
@@ -176,15 +181,34 @@ class KlotzID:
         # Load results
         pres = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, self.out_fldr, self.pressure_var), self.times)
         vol = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, self.out_fldr, self.volume_var), self.times)
+
+        if self.inflation_type == 'inverse_volume':
+            vol = vol[::-1]
+            vol = np.append(vol, self.ed_volume)
+            pres = np.append(0., pres)
+            pres_eps = np.append(0., pres_eps)
+
         ed_error = np.abs(self.ed_pressure/pres[-1]-1)
 
-        pres_klotz = self.klotz_function(vol)
-        g = pres_klotz-pres
+        g = self.compute_curve_difference(vol, pres)
         curve_error = np.linalg.norm(g)
 
         if plot:
             self.plot_inflation_curve('{}/{}/klotz_fit.png'.format(self.cheart_folder, self.out_fldr), vol, pres)
         print('Final simulation results: ED error = {:f}, curve error {:f}'.format(ed_error, curve_error))
+
+
+    def compute_curve_difference(self, vol, pres):
+        vol0 = vol[0]
+        voled = vol[-1]
+        vol_lim = (voled-vol0)/3 + vol0
+        
+        vol_cut = vol[vol > vol_lim]
+        pres_cut = pres[vol > vol_lim]
+
+        pres_klotz = self.klotz_function(vol_cut)
+
+        return np.linalg.norm(pres_klotz - pres_cut)
 
 
     def write_log(self, params, error):
@@ -206,12 +230,12 @@ class KlotzID:
 
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
-            p = Popen(['bash', '{}/run_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb), 
-                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile], 
+            p = Popen(['bash', '{}/run_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb),
+                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile],
                        stdout=ofile, stderr=ofile)
 
         return p
-    
+
 
     def plot_inflation_curve(self, fname, volume, pressure):
         plt.figure(1, clear=True)
