@@ -150,7 +150,7 @@ class KlotzID:
     def LM_update(self, g, pres, pres_eps):
         # Compute jacobian (forward differences)
         J = (pres_eps - pres)/self.eps
-        J = J[:,None]       # Making it a matrix
+        J = J[self.data_mask,None]       # Making it a matrix
 
         # Solve LM system
         mat = J.T@J + self.lam*np.eye(J.shape[1])
@@ -186,7 +186,6 @@ class KlotzID:
             vol = vol[::-1]
             vol = np.append(vol, self.ed_volume)
             pres = np.append(0., pres)
-            pres_eps = np.append(0., pres_eps)
 
         ed_error = np.abs(self.ed_pressure/pres[-1]-1)
 
@@ -203,12 +202,13 @@ class KlotzID:
         voled = vol[-1]
         vol_lim = (voled-vol0)/3 + vol0
         
-        vol_cut = vol[vol > vol_lim]
-        pres_cut = pres[vol > vol_lim]
+        self.data_mask = vol > vol_lim
+        vol_cut = vol[self.data_mask]
+        pres_cut = pres[self.data_mask]
 
         pres_klotz = self.klotz_function(vol_cut)
 
-        return np.linalg.norm(pres_klotz - pres_cut)
+        return pres_klotz - pres_cut
 
 
     def write_log(self, params, error):
