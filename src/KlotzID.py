@@ -122,6 +122,9 @@ class KlotzID:
             pres = np.append(0., pres)
             pres_eps = np.append(0., pres_eps)
 
+        if self.plot_intermediate:
+            self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.cheart_folder, self.out_fldr, self.it), vol, pres, params)
+            
         # Parameter update
         k, kb = params
 
@@ -130,9 +133,6 @@ class KlotzID:
         k = k*k_delta
         pres = pres*self.ed_pressure/pres[-1]
         pres_eps = pres_eps*self.ed_pressure/pres_eps[-1]
-
-        if self.plot_intermediate:
-            self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.cheart_folder, self.out_fldr, self.it), vol, pres, params)
 
         # Levenber-marquadt iteration
         g = self.compute_curve_difference(vol, pres)
