@@ -241,6 +241,7 @@ class KlotzID:
         plt.figure(1, clear=True)
         plt.plot(volume/1000, self.klotz_function(volume)*7.50062, 'k', label='klotz')
         plt.plot(volume/1000, pressure*7.50062, 'r', label='it={:d}'.format(self.it))
+        plt.annotate('k={:2.3e}\nkb={2.3e}'.format(params[0], params[1]), (0.1,0.9), xycoords='axes fraction')
         plt.xlabel('Volume [ml]')
         plt.ylabel('Pressure [kPa]')
         plt.savefig(fname, bbox_inches='tight')
