@@ -132,7 +132,7 @@ class KlotzID:
         pres_eps = pres_eps*self.ed_pressure/pres_eps[-1]
 
         if self.plot_intermediate:
-            self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.cheart_folder, self.out_fldr, self.it), vol, pres)
+            self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.cheart_folder, self.out_fldr, self.it), vol, pres, params)
 
         # Levenber-marquadt iteration
         g = self.compute_curve_difference(vol, pres)
@@ -193,7 +193,7 @@ class KlotzID:
         curve_error = np.linalg.norm(g)
 
         if plot:
-            self.plot_inflation_curve('{}/{}/klotz_fit.png'.format(self.cheart_folder, self.out_fldr), vol, pres)
+            self.plot_inflation_curve('{}/{}/klotz_fit.png'.format(self.cheart_folder, self.out_fldr), vol, pres, params)
         print('Final simulation results: ED error = {:f}, curve error {:f}'.format(ed_error, curve_error))
 
 
@@ -237,7 +237,7 @@ class KlotzID:
         return p
 
 
-    def plot_inflation_curve(self, fname, volume, pressure):
+    def plot_inflation_curve(self, fname, volume, pressure, params):
         plt.figure(1, clear=True)
         plt.plot(volume/1000, self.klotz_function(volume)*7.50062, 'k', label='klotz')
         plt.plot(volume/1000, pressure*7.50062, 'r', label='it={:d}'.format(self.it))
