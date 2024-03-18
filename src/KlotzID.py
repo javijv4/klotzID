@@ -17,7 +17,8 @@ import time
 
 
 class KlotzID:
-    def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, ed_pressure, ed_volume, inflation_type, ncores, plot_intermediate=False):
+    def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, ed_pressure, ed_volume, inflation_type, ncores, 
+                 plot_intermediate=False, save_intermediate=False):
         self.self_path = os.path.dirname(os.path.abspath(__file__))
         self.cheart_folder = os.path.dirname(pfile)
         if self.cheart_folder == '': self.cheart_folder = '.'
@@ -51,6 +52,7 @@ class KlotzID:
 
         # Others
         self.plot_intermediate = plot_intermediate
+        self.save_intermediate = save_intermediate
         self.logfile = 'klotzid.log'
 
 
@@ -99,6 +101,12 @@ class KlotzID:
         else:
             print('Optimization failed.')
 
+        if self.save_intermediate:
+            int_vol = np.vstack(self.intermediate['vol'])
+            int_pres = np.vstack(self.intermediate['pres'])
+            int_params = np.vstack(self.intermediate['params'])
+            np.savez('{}/{}/intermediate_results.npz'.format(self.cheart_folder, self.out_fldr), volume=int_vol, pressure=int_pres, params=int_params)
+
         if post_clean:
             self.post_clean()
         return params
@@ -124,6 +132,11 @@ class KlotzID:
 
         if self.plot_intermediate:
             self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.cheart_folder, self.out_fldr, self.it), vol, pres, params)
+
+        if self.save_intermediate:
+            self.intermediate['vol'].append(vol)
+            self.intermediate['pres'].append(pres)
+            self.intermediate['params'].append(params)
             
         # Parameter update
         k, kb = params
