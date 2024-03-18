@@ -53,6 +53,8 @@ class KlotzID:
         # Others
         self.plot_intermediate = plot_intermediate
         self.save_intermediate = save_intermediate
+        self.intermediate = {'vol': [], 'pres': [], 'params': []}
+
         self.logfile = 'klotzid.log'
 
 
