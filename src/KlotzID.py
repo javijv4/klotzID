@@ -24,6 +24,8 @@ class KlotzID:
         if self.cheart_folder == '': self.cheart_folder = '.'
         self.ncores = ncores
         self.inflation_type = inflation_type
+        assert (inflation_type == 'volume') or (inflation_type == 'inverse_volume'), 'Non-recognized inflation type'
+
         self.pfile = os.path.basename(pfile)
 
         # Output path
