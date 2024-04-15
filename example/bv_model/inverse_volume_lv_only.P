@@ -127,27 +127,6 @@
     ( N3_RV.3 * N3_RV.2)
     ( N3_RV.3 * N3_RV.3)
 
-!DefExpression={lv_minus_mat_expr}
-    -( N3_LV.1 * N3_LV.1)
-    -( N3_LV.1 * N3_LV.2)
-    -( N3_LV.1 * N3_LV.3)
-    -( N3_LV.2 * N3_LV.1)
-    -( N3_LV.2 * N3_LV.2)
-    -( N3_LV.2 * N3_LV.3)
-    -( N3_LV.3 * N3_LV.1)
-    -( N3_LV.3 * N3_LV.2)
-    -( N3_LV.3 * N3_LV.3)
-
-!DefExpression={rv_minus_mat_expr}
-    -( N3_RV.1 * N3_RV.1)
-    -( N3_RV.1 * N3_RV.2)
-    -( N3_RV.1 * N3_RV.3)
-    -( N3_RV.2 * N3_RV.1)
-    -( N3_RV.2 * N3_RV.2)
-    -( N3_RV.2 * N3_RV.3)
-    -( N3_RV.3 * N3_RV.1)
-    -( N3_RV.3 * N3_RV.2)
-    -( N3_RV.3 * N3_RV.3)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %  ---  Problem Definition  -------------------------------------------
@@ -158,7 +137,6 @@
    !UseVariablePointer={Fibers|Fibers}
    !ConstitutiveLaw={doubleE}
        mat_params_expr
-   !Inverse-mechanics
    !Nearly-incompressible={#BM}
   !Boundary-patch-definitions
     #mv  Disp  dirichlet  0 0 0
@@ -172,8 +150,8 @@
     !UseVariablePointer={Space|Space}
     !AddTerms={TestVariable[Disp]| LV_LM[trace]}
     !Addterms
-       TestVariable[LV_LM*]
-       Disp[trace;lv_minus_mat_expr]  SpaceO[trace;lv_mat_expr]   LV_Vol[#fluxscale;flux]
+      TestVariable[LV_LM*]
+      Disp[trace;lv_mat_expr]  Space[trace;lv_mat_expr]   LV_Vol_expr[1;flux]
     !Boundary-conditions-not-required
     !SetRootTopology={TP_lvendo}
 
@@ -181,7 +159,7 @@
     !UseVariablePointer={Space|Space}
     !AddTerms={TestVariable[Disp]| RV_LM[trace]}
     !Addterms
-       TestVariable[RV_LM*]
-       Disp[trace;rv_minus_mat_expr]  SpaceO[trace;rv_mat_expr]   RV_Vol[#fluxscale;flux]
+      TestVariable[RV_LM*]
+      Disp[trace;rv_mat_expr]  Space[trace;rv_mat_expr]   RV_Vol_expr[1;flux]
     !Boundary-conditions-not-required
     !SetRootTopology={TP_rvendo}
