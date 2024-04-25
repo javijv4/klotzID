@@ -117,6 +117,7 @@ class KlotzID:
 
 
     def optimize_iteration_volume(self, params):
+        print('Running simulation with parameters k={:f} and kb={:f}'.format(params[0], params[1]))
         k, kb = params
 
         p1 = self.run_cheart_inflation((k, kb), 'tmp1')
@@ -161,6 +162,7 @@ class KlotzID:
 
         # Return new parameters
         params = (k, kb)
+        print(params)
         return params, error
 
 

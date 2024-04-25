@@ -1,0 +1,13 @@
+#lv_endo=1
+#rv_endo=2
+#lv_epi=3
+#rv_epi=4
+#rv_septum=5
+#av=6
+#pv=7
+#tv=8
+#mv=9
+#rv_lv_junction=10
+#rv_lv_ant=21
+#rv_lv_post=22
+#lv_septum=27
