@@ -1,10 +1,15 @@
 #!/bin/bash
 k=$1
 kb=$2
-outdir=$3
-ncores=$4
-folder=$5
-pfile=$6
+par_LV=$3
+par_RV=$4
+outdir=$5
+ncores=$6
+folder=$7
+pfile=$8
+
 
 cd ${folder}
-mpirun -np ${ncores} cheartsolver.out ${pfile} -\#k=${k} -\#kb=${kb} -\#outdir=${outdir}
+echo Bash
+echo "mpirun -np ${ncores} cheartsolver.out ${pfile} -\#k=${k} -\#kb=${kb} -\#outdir=${outdir} -\#par_LV=${par_LV} -\#par_RV=${par_RV}"
+mpirun -np ${ncores} cheartsolver.out ${pfile} -\#k=${k} -\#kb=${kb} -\#outdir=${outdir} -\#par_LV=${par_LV} -\#par_RV=${par_RV}

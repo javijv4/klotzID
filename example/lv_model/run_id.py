@@ -8,7 +8,7 @@ Created on Mon Feb 26 11:29:50 2024
 
 from KlotzID import KlotzID
 
-ncores = 5                              # WARNING!!! The program uses (ncores x 2) cores.
+ncores = 4                              # WARNING!!! The program uses (ncores x 2) cores.
 out_fldr = 'mesh/out'                   # Output folder
 out_fname = 'mesh/optimize_params.P'    # Final parameters will be saved in this file
 inflation_type = 'volume'               # Method: "volume" or "inverse_volume"

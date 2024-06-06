@@ -1,0 +1,96 @@
+% --- Solver Options ----------------------------------------------
+!SetSolverGroup={INFLATE|AddVariables|LV_Vol|RV_Vol}
+
+
+% --- Topology -------------------------------------------------------
+% For LM
+!DefTopology={TP1endo_lv | #meshdir/bv_model_endo_lv  | LinSurfBasis}
+  !SetTopology={TP1endo_lv|CreateInBoundary|[TP1;#endo_lv]}
+
+!DefTopology={TP1endo_rv | #meshdir/bv_model_endo_rv  | LinSurfBasis}
+  !SetTopology={TP1endo_rv|CreateInBoundary|[TP1;#endo_rv]}
+
+% --- Interfaces -----------------------------------------------------
+!DefInterface={ManyToOne|TP1endo_lv|TP1|#meshdir/TP1endo-TP1_lv_solid.IN|NestedInBndry[#endo_lv]}
+!DefInterface={ManyToOne|TP1endo_rv|TP1|#meshdir/TP1endo-TP1_rv_solid.IN|NestedInBndry[#endo_rv]}
+
+
+% --- Variables ------------------------------------------------------
+
+!DefVariablePointer={LV_Vol|null_topology|1}
+  !SetVariablePointer={LV_Vol|TEMPORAL_UPDATE_EXPR|LV_Vol_expr|1}
+
+
+!DefVariablePointer={RV_Vol|null_topology|1}
+  !SetVariablePointer={RV_Vol|TEMPORAL_UPDATE_EXPR|RV_Vol_expr|1}
+
+
+!SetExportFrequency={LV_Vol|RV_Vol|1}
+
+!DefVariablePointer={N3_LV | null_topology | #datadir/N3_lv.D | 3}
+!DefVariablePointer={N3_RV | null_topology | #datadir/N3_rv.D | 3}
+
+% --- Expressions ------------------------------------------------------
+!DefExpression={LV_Vol_expr}
+  (#EDV - #V0)*t + #V0
+
+!DefExpression={RV_Vol_expr}
+  (#EDV_rv - #V0_rv)*t + #V0_rv
+
+!DefExpression={v0}
+   0
+   0
+   0
+
+% Expression to calculate the volume in this region
+!DefExpression={mat_expr_lv}
+    ( N3_LV.1 * N3_LV.1) 
+    ( N3_LV.1 * N3_LV.2) 
+    ( N3_LV.1 * N3_LV.3) 
+    ( N3_LV.2 * N3_LV.1) 
+    ( N3_LV.2 * N3_LV.2) 
+    ( N3_LV.2 * N3_LV.3) 
+    ( N3_LV.3 * N3_LV.1) 
+    ( N3_LV.3 * N3_LV.2) 
+    ( N3_LV.3 * N3_LV.3) 
+
+!DefExpression={mat_expr_rv}
+    ( N3_RV.1 * N3_RV.1) 
+    ( N3_RV.1 * N3_RV.2) 
+    ( N3_RV.1 * N3_RV.3) 
+    ( N3_RV.2 * N3_RV.1) 
+    ( N3_RV.2 * N3_RV.2) 
+    ( N3_RV.2 * N3_RV.3) 
+    ( N3_RV.3 * N3_RV.1) 
+    ( N3_RV.3 * N3_RV.2) 
+    ( N3_RV.3 * N3_RV.3) 
+
+
+!DefExpression={is_t_zero}
+    1*(t<= #dt*1.01)
+
+!DefExpression={is_t_not_zero}
+    1*(t> #dt*1.01)
+
+
+
+
+% ----  Volume constrain (LV) ---------------------------------------------------------
+!DefProblem={lvendo|fscoupling_problem}
+  !UseVariablePointer={Space|Space}
+  !AddTerms={TestVariable[Disp]| par_LV[v0]}
+  !Addterms
+     TestVariable[par_LV*]
+     Disp[trace;mat_expr_lv]  Space[trace;mat_expr_lv]   LV_Vol_expr[#fluxscale;flux]
+  !Boundary-conditions-not-required
+  !SetRootTopology={TP1endo_lv}
+
+!DefProblem={rvendo|fscoupling_problem}
+  !UseVariablePointer={Space|Space}
+  !AddTerms={TestVariable[Disp]| par_RV[v0]}
+  !Addterms
+     TestVariable[par_RV*]
+     Disp[trace;mat_expr_rv]  Space[trace;mat_expr_rv]   RV_Vol_expr[#fluxscale;flux]
+  !Boundary-conditions-not-required
+  !SetRootTopology={TP1endo_rv}
+

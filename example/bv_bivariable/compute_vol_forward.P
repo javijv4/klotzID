@@ -1,0 +1,120 @@
+
+
+#time = 90
+#meshdir = ./mesh/
+#datadir = ./mesh/data
+#dispdir=./tmp3/
+#outdir=./tmp3/
+
+
+
+!SetOutputPath=#outdir
+
+% --- Solver Definition ----------------------------------------------
+!DefSolverGroup={INFLATION|null|lv_vol_calc|rv_vol_calc}
+!DefSolverSubGroup={INFLATION|SOLVER_SEQUENTIAL|lv_vol_calc|rv_vol_calc}
+
+% --- Basis function definition --------------------------------------
+!UseBasis={LinBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS6}
+!UseBasis={LinSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS6}
+!UseBasis={ConstSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE0|KEAST_LYNESS6}
+!UseBasis={QuadBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE2|KEAST_LYNESS6}
+
+% --- Topology -------------------------------------------------------
+!DefTopology={TP1 | #meshdir/bv_model | LinBasis}
+!DefTopology={TP2 | #meshdir/bv_model_quad | QuadBasis}
+!DefTopology={TP_lvendo | #meshdir/lv_endo_lin | LinSurfBasis}
+!SetTopology={TP_lvendo | CreateInBoundary | [TP1;1]}
+!DefTopology={TP_rvendo | #meshdir/rv_endo_lin | LinSurfBasis}
+!SetTopology={TP_rvendo | CreateInBoundary | [TP1;2]}
+
+!DefTopology={TP_lvendo_const | #meshdir/lv_endo_const | ConstSurfBasis}
+  !SetTopology={TP_lvendo_const | SpatialConstant}
+!DefTopology={TP_rvendo_const | #meshdir/rv_endo_const | ConstSurfBasis}
+  !SetTopology={TP_rvendo_const | SpatialConstant}
+
+% -- Interfaces -----------------------------------------------------
+!DefInterface={ManyToOne|TP_lvendo|TP1|#meshdir/lvendo-bvmodel.IN|NestedInBoundary[1]}
+!DefInterface={ManyToOne|TP_rvendo|TP1|#meshdir/rvendo-bvmodel.IN|NestedInBoundary[2]}
+!DefInterface={OneToOne|TP_lvendo_const|TP_lvendo}
+!DefInterface={OneToOne|TP_rvendo_const|TP_rvendo}
+
+!DefInterface={OneToOne|TP1|TP2}
+
+% --- Variables ------------------------------------------------------
+!DefVariablePointer={Space0| TP2 | #meshdir/bv_model_quad | 3}
+
+!DefVariablePointer={U| TP2 | #dispdir/Disp-#time.D | 3}
+   %%%!SetVariablePointer{U|ReadBinary} 
+
+!DefVariablePointer={N3_LV | null_topology | #datadir/N3_lv.D | 3}
+!DefVariablePointer={N3_RV | null_topology | #datadir/N3_rv.D | 3}
+
+% --- Expressions ----------------------------------------------------
+% Expression to calculate the volume in this region
+!DefVariablePointer={Space | TP2 | 3}
+  !SetVariablePointer={Space | temporal_update_expr | space_expr | 3}
+    !DefExpression={space_expr}
+      Space0.1 + U.1
+      Space0.2 + U.2
+      Space0.3 + U.3
+
+!DefExpression={rv_switch}
+    1  %bv_region < 5.5
+
+!DefExpression={mat_expr_lv}
+    ( N3_LV.1 * N3_LV.1)
+    ( N3_LV.1 * N3_LV.2)
+    ( N3_LV.1 * N3_LV.3)
+    ( N3_LV.2 * N3_LV.1)
+    ( N3_LV.2 * N3_LV.2)
+    ( N3_LV.2 * N3_LV.3)
+    ( N3_LV.3 * N3_LV.1)
+    ( N3_LV.3 * N3_LV.2)
+    ( N3_LV.3 * N3_LV.3)
+
+!DefExpression={mat_expr_rv}
+    ( N3_RV.1 * N3_RV.1)
+    ( N3_RV.1 * N3_RV.2)
+    ( N3_RV.1 * N3_RV.3)
+    ( N3_RV.2 * N3_RV.1)
+    ( N3_RV.2 * N3_RV.2)
+    ( N3_RV.2 * N3_RV.3)
+    ( N3_RV.3 * N3_RV.1)
+    ( N3_RV.3 * N3_RV.2)
+    ( N3_RV.3 * N3_RV.3)
+
+!DefVariablePointer={Flv|TP1|3}
+  !SetVariablePointer={Flv|INIT_EXPR|operator_lv}
+    !DefExpression={operator_lv}
+      mat_expr_lv.1 * Space.1 + mat_expr_lv.2 * Space.2 + mat_expr_lv.3 * Space.3
+      mat_expr_lv.4 * Space.1 + mat_expr_lv.5 * Space.2 + mat_expr_lv.6 * Space.3
+      mat_expr_lv.7 * Space.1 + mat_expr_lv.8 * Space.2 + mat_expr_lv.9 * Space.3
+
+!DefVariablePointer={Frv|TP1|3}
+  !SetVariablePointer={Frv|INIT_EXPR|operator_rv}
+    !DefExpression={operator_rv}
+      mat_expr_rv.1 * Space.1 + mat_expr_rv.2 * Space.2 + mat_expr_rv.3 * Space.3
+      mat_expr_rv.4 * Space.1 + mat_expr_rv.5 * Space.2 + mat_expr_rv.6 * Space.3
+      mat_expr_rv.7 * Space.1 + mat_expr_rv.8 * Space.2 + mat_expr_rv.9 * Space.3
+
+!SetExportFrequency={Space|Flv|Frv|-1}
+
+!DefProblem={lv_vol_calc|norm_calculation}
+  !UseVariablePointer={Space|Space}
+  !Absolute-value
+  !Boundary-conditions-not-required
+  !UseVariablePointer={Term1|Flv}
+  !SetRootTopology={TP1}
+  !Boundary-normal={1}
+  !Output-filename={volume_lv_#time.D}
+
+
+!DefProblem={rv_vol_calc|norm_calculation}
+  !UseVariablePointer={Space|Space}
+  !Absolute-value
+  !Boundary-conditions-not-required
+  !UseVariablePointer={Term1|Frv}
+  !SetRootTopology={TP1}
+  !Boundary-normal={2|10}
+  !Output-filename={volume_rv_#time.D}

@@ -1,0 +1,194 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% This P file is used to calculate initial model volumes in lv and rv
+% for constraining inflation.
+%
+% John Sayut
+% Date: November 10 2023
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --- INLUDE P FILES --------------------------------------------------
+
+% Macros to define:
+% #k = 
+% #kb = 
+
+ 
+
+#meshdir=./mesh
+#datadir=./mesh/data/
+#outdir=./tmp3/init/
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --- PARAMETERS --------------------------------------------------
+#build=EVALUATE_EVERY_BUILD
+#nsteps=1
+#dt=.01
+#outputrate=1
+#tol=1e-6
+
+
+#fluxscale=1
+
+#EDV=1.88990934787700913148*(10^5)
+#V0=105185.24017119760
+
+#EDV_rv=2.48863804719955543987*(10^5)
+#V0_rv=147159.01436344426
+
+
+
+
+
+
+#endo_lv=1
+#endo_rv=2
+
+
+#pres_lv= 2.464647104639350 %kPa
+#pres_rv= 1.247110238886919 %kPa
+
+
+#scale = 1e6
+#eps   = 0
+
+% --- Solver Definition ---------------------------------------------
+
+!DefSolverGroup={INFLATE|TimeStepping|Matrix}
+!DefSolverSubGroup={INFLATE|seq_fp_linesearch|Matrix|ScaleFirstResidual[10000]}
+!SetSolverGroup={INFLATE|L2TOL|#tol}
+  %%%!SetSolverGroup={INFLATE|AddVariables|par_LV|par_RV}
+
+% Volume constraints
+!DefSolverMatrix={Matrix|SOLVER_MUMPS|solid|lvendo|rvendo}
+!SetSolverMatrix={Matrix | SolverMatrixCalculation | #build}
+
+!SetSolverGroup={INFLATE|export_initial_condition}
+!DefTimeStepScheme={TimeStepping}
+1 #nsteps #dt
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --- Basis function definition --------------------------------------
+!UseBasis={LinBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS6}
+!UseBasis={ConstBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE0|KEAST_LYNESS6}
+!UseBasis={LinSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS6}
+!UseBasis={QuadBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE2|KEAST_LYNESS6}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --- Topology -------------------------------------------------------
+!DefTopology={TP1 | #meshdir/bv_model | LinBasis}
+!DefTopology={TP2 | #meshdir/bv_model_quad | QuadBasis}
+!DefTopology={TP1_disc | #meshdir/bv_lin_disc | LinBasis}
+  !SetTopology={TP1_disc|MakeDiscontinuous}
+!DefTopology={TP1_disc_const | #meshdir/bv_const_disc | ConstBasis}
+  !SetTopology={TP1_disc_const | MakeDiscontinuous}
+
+!DefTopology={TPC|#meshdir/ConstBIV|ConstBasis}
+  !SetTopology={TPC|SpatialConstant}
+
+!DefTopology={TPEmb |mesh/bv_emb|none}
+  !SetTopology={TPEmb|EmbeddedInTopology|TP1}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% -- Interfaces -----------------------------------------------------
+!DefInterface={OneToOne|TP1|TP2|TP1_disc|TPC|TP1_disc_const|TPEmb}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --- Variables ------------------------------------------------------
+!DefVariablePointer={X0    | TP1 | #meshdir/bv_model | 3}
+!DefVariablePointer={Space | TP2 | #meshdir/bv_model_quad | 3}
+!DefVariablePointer={Disp | TP2 |3}
+!DefVariablePointer={Pres| TP1 | 1}
+!DefVariablePointer={Fibers|TP1_disc|#meshdir/fiber_bayer.field|9}
+
+!DefVariablePointer={phi | TP1_disc_const | #meshdir/fiber.mask | 1} % equal to one for the left ventricle
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --- Other -----------------------------------------------------------
+!SetExportFrequency={Disp|Pres|#outputrate}
+!SetExportFrequency={Fibers|X0|Space|-1}
+%!SetExportFrequency={par_LV|par_RV|1}
+!SetOutputPath={#outdir/}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --- Expressions ----------------------------------------------------
+
+
+!DefExpression={ve_mat_params_expr}
+  10.0200 * (#kb)  %b1  - no passive expr
+  1.1580 * ( #kb)   %b2 - no passive expr
+  1.64 * ( passive_scale_expr* #k )      %bff
+  0.897 * ( passive_scale_expr* #k  )     %bss
+  0.409 * ( passive_scale_expr* #k  )    %bnn
+  6.175 * ( passive_scale_expr* #k  )      %bfs
+  3.52 * ( passive_scale_expr* #k  )      %bfn
+  2.895 * ( passive_scale_expr* #k  )      %bns
+
+!DefExpression={nh_param}
+  0.416 * #k * passive_scale_expr
+
+
+!DefExpression={passive_scale_expr}
+   1 %%%
+
+!DefExpression={pexpr_lv}
+   -1.0*#pres_lv*t*t
+
+
+
+!DefExpression={pexpr_rv}
+   -1.0*#pres_rv*t*t
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  ---  Problem Definition  -------------------------------------------
+ !DefProblem={solid|STEADY_QUASI_STATIC_ELASTICITY}
+   !UseVariablePointer={Space|Space}
+   !UseVariablePointer={Displacement|Disp}
+   !UseVariablePointer={Fibers|Fibers}
+   !UseVariablePointer={Pressure|Pres}
+
+
+  !ConstitutiveLaw={neohookean}
+    nh_param
+
+  !ConstitutiveLaw={doubleE}
+    ve_mat_params_expr
+  
+  !Nearly-Incompressible={100}
+
+  %!ConstitutiveLaw={fractional-diffeq}
+  %  storeL
+  %  0.184364860111829  9  1.0  0.022633532445229  10.0     % alpha N Tf delta s
+  %  InitPK2
+  %  frac  parm  storeR  0.184364860111829  9  1.0  10.0
+  %  frac  law   doubleE  [ve_mat_params_expr]
+
+
+   !Boundary-patch-definitions
+     %1  Disp  SCALED_NORMAL    pexpr_lv
+     %2  Disp  SCALED_NORMAL    pexpr_rv
+     4  Disp  DIRICHLET 0.0 0.0 0.0
+     5  Disp  DIRICHLET 0.0 0.0 0.0
+     6  Disp  DIRICHLET 0.0 0.0 0.0
+     7  Disp  DIRICHLET 0.0 0.0 0.0
+
+
+    % Javi's problem for volume calculation
+    !include={problem_volume_calculation.P}
+
+
+
+
+
+

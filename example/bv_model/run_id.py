@@ -8,10 +8,10 @@ Created on Mon Feb 26 11:29:50 2024
 
 from KlotzID import KlotzID
 
-ncores = 3   # WARNING!!! The program uses ncores x 2 cores.
-out_fldr = 'out_mh'
+ncores = 4   # WARNING!!! The program uses ncores x 2 cores.
+out_fldr = 'out_bvar'
 out_fname = 'optimize_params.P'
-inflation_type = 'inverse_volume'
+inflation_type = 'volume'
 pfile = 'inverse_volume_lv.P'
 
 pressure_var = 'LV_LM'
