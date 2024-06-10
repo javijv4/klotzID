@@ -18,22 +18,29 @@ import time
 
 class KlotzID:
     def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, ed_pressure, ed_volume, inflation_type, ncores, 
-                 pfile_bv_init=None,pfile_bv=None,
-                 plot_intermediate=False, save_intermediate=False,lvrv=False):
+                 pfile_bv_init=None,pfile_bv=None,johns_export=False,
+                 plot_intermediate=False, save_intermediate=False,ed_pressure_rv=0.0,ed_volume_rv=0.0):
         self.self_path = os.path.dirname(os.path.abspath(__file__))
         self.cheart_folder = os.path.dirname(pfile)
         if self.cheart_folder == '': self.cheart_folder = '.'
         self.ncores = ncores
         self.inflation_type = inflation_type
-        assert (inflation_type == 'volume') or (inflation_type == 'inverse_volume'), 'Non-recognized inflation type'
+        assert (inflation_type == 'volume') or (inflation_type == 'inverse_volume') or (inflation_type == 'volume_bivariable'), 'Non-recognized inflation type'
 
         self.pfile = os.path.basename(pfile)
 
-        if lvrv:
+        if inflation_type=='volume_bivariable':
             if pfile_bv_init is None or pfile_bv is None:
                 raise ValueError("Both bivariable P files must be provided if lvrv is True")
             self.pfile_bv_init = pfile_bv_init
             self.pfile_bv = pfile_bv
+            self.ed_pressure_rv = ed_pressure_rv
+            self.ed_volume_rv = ed_volume_rv
+            self.pars=(('par_LV','par_RV'))
+
+            if ed_pressure_rv == 0.0 or ed_volume_rv == 0.0:
+                raise ValueError("For bivariable inflation, ED pressure and volume for the RV must be provided")
+
         else:
             pass
 
@@ -45,8 +52,7 @@ class KlotzID:
 
         self.pressure_var = pressure_var
         self.volume_var = volume_var
-
-        self.pars=(('par_LV','par_RV'))
+        self.johns_export = johns_export
 
         self.times = sim_times
 
@@ -65,7 +71,6 @@ class KlotzID:
         self.it = 0
 
         # Others
-        self.lvrv=lvrv
         self.plot_intermediate = plot_intermediate
         self.save_intermediate = save_intermediate
         self.intermediate = {'vol': [], 'pres': [], 'params': []}
@@ -111,13 +116,14 @@ class KlotzID:
             new_params, error = self.optimize_iteration_volume(params)
 
 
-            if self.lvrv and error < 1e-2:
+            if self.inflation_type == 'volume_bivariable' and error < 1e-2:
                 print('Entering bivariable inflation with error = '+str(error))
                 new_params_1= self.optimize_lvrv(new_params)
                 new_params=new_params_1
                 ###print('BV error: '+str(error_bv))
-            else if self.lvrv:
+            elif self.inflation_type == 'volume_bivariable':
                 print('Curve error is too high, running Klotz inflate again')
+                print('Error: '+str(error))
 
 
 
@@ -131,7 +137,10 @@ class KlotzID:
             end_time = time.time()
             print('Optimization succesful in {:d} iterations and {:2.3f} s'.format(self.it, end_time-start_time))
             print('Parameters found are k={:f} and kb={:f}'.format(params[0], params[1]))
-            print('LV/RV params are par_lv={:f} and par_rv={:f}'.format(params[2], params[3]))
+            
+            if self.inflation_type=='volume_bivariable':
+                print('LV/RV params are par_lv={:f} and par_rv={:f}'.format(params[2], params[3]))
+
         else:
             print('Optimization failed.')
 
@@ -159,8 +168,18 @@ class KlotzID:
 
 
     def optimize_iteration_volume(self, params):
-        print('Running simulation with parameters k='+str(params[0])+' and kb='+str(params[1])+' and par_lv='+str(params[2])+' and par_rv='+str(params[3]))
-        k, kb,par_lv,par_rv = params
+        
+        print('Running simulation with parameters k='+str(params[0])+' and kb='+str(params[1]))
+        
+        if self.inflation_type=='volume_bivariable':
+            print('Bivariable parameters par_lv='+str(params[2])+' and par_rv='+str(params[3]))
+            k, kb,par_lv,par_rv = params
+        
+        else:
+            k,kb = params
+            par_lv=0
+            par_rv=0
+        
 
         p1 = self.run_cheart_inflation((k, kb,par_lv,par_rv), 'tmp1')
         p2 = self.run_cheart_inflation((k, kb+self.eps,par_lv,par_rv), 'tmp2')
@@ -186,7 +205,11 @@ class KlotzID:
             self.intermediate['params'].append(params)
             
         # Parameter update
-        k, kb,par_lv,par_rv = params
+        if self.inflation_type=='volume_bivariable':
+            k, kb,par_lv,par_rv = params
+        
+        else:
+            k,kb = params
 
         # Linear correction
         k_delta = self.ed_pressure/pres[-1]
@@ -227,7 +250,10 @@ class KlotzID:
         #print('LV/RV params:')
         #print(par_lv,par_rv)
 
-        params_full=(k,kb,par_lv,par_rv)
+        if self.inflation_type=='volume_bivariable':
+            params_full=(k,kb,par_lv,par_rv)
+        else:
+            params_full=(k,kb)
 
         return params_full, error
 
@@ -321,8 +347,23 @@ class KlotzID:
     def write_log(self, params, error):
         with open(self.logfile, "a") as file:
             # Writing data to a file
-            file.write("Iteration {:d}, k={:f}, kb={:f}, error = {:e}, par_lv = {:f}, par_rv = {:f}\n".format(self.it, params[0], params[1], error, params[2],params[3]))
+            if self.inflation_type == 'volume_bivariable':
 
+                klv=params[0]*(1+params[2])
+                krv=params[0]*(1+params[3])
+                kb=params[1]
+
+                
+                if self.johns_export:
+                    file.write("Iteration {:d}, k={:f}, kb={:f}, par_LV={:f}, par_RV={:f}\n".format(self.it,params[0],params[1],params[2],params[3]))
+
+                else:
+                    file.write("Iteration {:d}, k_lv={:f}, k_rv={:f}, kb={:f}, error = {:e}\n".format(self.it, klv,krv,kb, error))
+
+
+
+            else:
+                file.write("Iteration {:d}, k={:f}, kb={:f}, error = {:e}\n".format(self.it, params[0], params[1], error))
 
     @staticmethod
     def write_params(fname, params):
@@ -336,9 +377,10 @@ class KlotzID:
         k, kb,par_lv,par_rv = params
 
         # Run cheart
+
         with open('{}.log'.format(outdir), 'w') as ofile:
             p = Popen(['bash', '{}/run_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb), '{:f}'.format(par_lv),'{:f}'.format(par_rv),
-                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile],
+                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile,'{:f}'.format(self.ed_volume)],
                        stdout=ofile, stderr=ofile)
 
         return p
@@ -350,7 +392,9 @@ class KlotzID:
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
             p = Popen(['bash', '{}/run_bivariable.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb),
-                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init,self.pfile_bv],
+                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init,self.pfile_bv,
+                       '{:f}'.format(self.ed_volume),'{:f}'.format(self.ed_pressure),
+                       '{:f}'.format(self.ed_volume_rv),'{:f}'.format(self.ed_pressure_rv)],
                        stdout=ofile, stderr=ofile)
 
         return p
