@@ -1,0 +1,150 @@
+#meshdir = mesh
+#datadir = #meshdir 
+!SetOutputPath={#outdir}
+
+#st=1
+#et=1
+#dt=0.01
+
+#EDP=2.0
+#EDV=131153.376791549788322
+#V0=62975.965231251917
+
+#com_1=0.0
+#com_2=0.0
+#com_3=-20.8836
+
+#exportrate = 1
+
+!include={boundaries.P}
+% --- Solver Definition ----------------------------------------------
+!DefSolverGroup={SG1|TimeStepping|Matrix}
+  !DefSolverSubGroup={SG1|SEQ_FP_LINESEARCH|Matrix|ScaleFirstResidual[1000]}
+  !SetSolverGroup={SG1|L2TOL|1e-8}
+  !SetSolverGroup={SG1|ITERATION|30}
+  !SetSolverGroup={SG1|LINESEARCHITER|10} 
+  !SetSolverGroup={SG1|AddVariables|LV_Vol}
+
+
+
+!DefSolverMatrix={Matrix|SOLVER_MUMPS|solid|lvendo}
+  !SetSolverMatrix={Matrix |ordering      |parallel}
+  !SetSolverMatrix={Matrix | SolverMatrixCalculation | evaluate_every_build}
+
+!DefTimeStepScheme={TimeStepping}
+   #st   #et   #dt
+
+% --- Basis function definition --------------------------------------
+!UseBasis={QuadBasis|HEXAHEDRAL_ELEMENT|NODAL_LAGRANGE2|GAUSS_LEGENDRE4}
+!UseBasis={LinBasis|HEXAHEDRAL_ELEMENT|NODAL_LAGRANGE1|GAUSS_LEGENDRE4}
+!UseBasis={QuadSurfBasis|QUADRILATERAL_ELEMENT|NODAL_LAGRANGE2|GAUSS_LEGENDRE4}
+
+% --- Topology -------------------------------------------------------
+!DefTopology={TP1 | #meshdir/ellipsoid | LinBasis}
+!DefTopology={TP2 | #meshdir/ellipsoid_quad | QuadBasis}
+
+!DefTopology={TPfibers | #meshdir/fiber | LinBasis}
+
+% For LM
+!DefTopology={TP2endo | #meshdir/lv_model_quad_endo  | QuadSurfBasis}
+  !SetTopology={TP2endo|CreateInBoundary|[TP2;#endo]}
+
+
+% --- Interfaces -----------------------------------------------------
+!DefInterface={OneToOne|TP2|TP1|TPfibers}
+!DefInterface={ManyToOne|TP2endo|TP2|#meshdir/TP2endo-TP2_solid.IN|NestedInBndry[#endo]}
+
+
+% --- Variables ------------------------------------------------------
+!DefVariablePointer={Space| TP2 | #meshdir/ellipsoid_quad | 3}
+!DefVariablePointer={SpaceO| TP2 | #meshdir/ellipsoid_quad | 3}
+!DefVariablePointer={Disp| TP2 | 3}
+!DefVariablePointer={Pres| TP1 | 1}
+!DefVariablePointer={Fibers| TPfibers |#datadir/fiber.field|9}
+
+!DefVariablePointer={par_LV | null_topology | 1}
+!DefVariablePointer={LV_LM|null_topology|1}
+
+!DefVariablePointer={LV_Vol|null_topology|1}
+  !SetVariablePointer={LV_Vol|TEMPORAL_UPDATE_EXPR|LV_Vol_expr|1}
+
+!SetExportFrequency={LV_LM|LV_Vol|1}
+
+
+% --- Other ------------------------------------------------------------
+!SetExportFrequency={Disp|Pres|#exportrate}
+!SetExportFrequency={Space|SpaceO|Fibers|-1}
+
+
+% --- Expressions ------------------------------------------------------
+% Material Parameters
+!DefExpression={mat_params_expr}
+  0.61  * #k  * passive_scale_expr
+  7.5   * #kb 
+  1.56  * #k  * passive_scale_expr
+  35.31 * #kb 
+  0.
+  0.
+  0.
+  0.
+
+
+% Pressure and volume
+!DefExpression={passive_scale_expr}
+    1
+
+!DefExpression={LV_Vol_expr}
+  (#EDV - #V0)*t + #V0
+
+!DefExpression={pexpr_lv}
+  -#EDP*t^2
+
+
+% Volume constraint
+!DefExpression={base_normal}
+  0.
+  0.
+  -1.
+
+% Expression to calculate the volume in this region
+!DefExpression={mat_expr_lv}
+  0.5 * (1 - base_normal.1 * base_normal.1)
+  0.5 * (0 - base_normal.1 * base_normal.2)
+  0.5 * (0 - base_normal.1 * base_normal.3)
+  0.5 * (0 - base_normal.2 * base_normal.1)
+  0.5 * (1 - base_normal.2 * base_normal.2)
+  0.5 * (0 - base_normal.2 * base_normal.3)
+  0.5 * (0 - base_normal.3 * base_normal.1)
+  0.5 * (0 - base_normal.3 * base_normal.2)
+  0.5 * (1 - base_normal.3 * base_normal.3)
+
+
+
+%  ---  Problem Definition  --------------------------------------------
+!DefProblem={solid|STEADY_QUASI_STATIC_ELASTICITY}
+  !UseVariablePointer={Space|Space}
+  !UseVariablePointer={Displacement|Disp}
+  !UseVariablePointer={Pressure|Pres}
+  !UseVariablePointer={Fibers|Fibers}
+  !SetRootTopology={TP2}
+
+% --- Active/passive laws ---------------------------------------------
+  !ConstitutiveLaw={holzapfel-ogden}
+    mat_params_expr
+  !Nearly-Incompressible={100}
+
+  % --- Boundary conditions --------------------------------------------
+  !Boundary-patch-definitions
+    #base  Disp  DIRICHLET 0. 0. 0.
+
+% ----  Volume constrain (LV) ---------------------------------------------------------
+!DefProblem={lvendo|fscoupling_problem}
+  !UseVariablePointer={Space|Space}
+  !AddTerms={TestVariable[Disp]| LV_LM[trace]}
+  !Addterms
+     TestVariable[LV_LM*]
+     Disp[trace;mat_expr_lv]  Space[trace;mat_expr_lv]   LV_Vol_expr[1;flux]
+  !Boundary-conditions-not-required
+  !SetRootTopology={TP2endo}
+
+
