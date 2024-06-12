@@ -17,9 +17,12 @@ import time
 
 
 class KlotzID:
-    def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, lv_ed_pressure, lv_ed_volume, inflation_type, ncores,
+    def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, 
+                 lv_ed_pressure, lv_ed_volume, 
+                 inflation_type, ncores,
                  constraint_vars=None, pfile_bv_init=None,pfile_bv=None,alternate_export=False,
-                 plot_intermediate=False, save_intermediate=False,rv_ed_pressure=0.0,rv_ed_volume=0.0):
+                 plot_intermediate=False, save_intermediate=False,
+                 rv_ed_pressure=0.0,rv_ed_volume=0.0):
         self.self_path = os.path.dirname(os.path.abspath(__file__))
         self.cheart_folder = os.path.dirname(pfile)
         if self.cheart_folder == '': self.cheart_folder = '.'
@@ -56,6 +59,8 @@ class KlotzID:
                 raise ValueError('For variable inflation, both bivariable P files must be provided')
             self.pfile_bv_init = pfile_bv_init
             self.pfile_bv = pfile_bv
+            self.rv_ed_pressure = rv_ed_pressure
+            self.rv_ed_volume = rv_ed_volume
             if len(constraint_vars) != 1:
                 raise ValueError("For variable inflation, one constraint variable must be provided")
             self.pars=constraint_vars
@@ -208,7 +213,7 @@ class KlotzID:
         # Update k if variable used
         if self.inflation_type=='volume_bivariable' or self.inflation_type=='volume_variable':
             print('Updating k using variable inflation par_LV')
-            k = (1+par_lv)
+            k = k*(1+par_lv)
             par_lv = 0
             if self.inflation_type=='volume_bivariable':
                 par_rv = par_rv/k - 1
@@ -443,22 +448,14 @@ class KlotzID:
 
     def run_cheart_variable_inflation(self, params, outdir):
         k, kb = params
-
-        if self.inflation_type=='volume_variable':
-            cmds = ['bash', '{}/run_variable_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb),
-                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init,self.pfile_bv,
-                       '{:f}'.format(self.lv_ed_volume),'{:f}'.format(self.lv_ed_pressure)]
-        elif self.inflation_type=='volume_bivariable':
-            cmds = []
-
-
+        
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
-            p = Popen('bash', '{}/run_variable_inflation.sh'.format(self.self_path), 
+            p = Popen(['bash', '{}/run_variable_inflation.sh'.format(self.self_path), 
                       '{:f}'.format(k), '{:f}'.format(kb),
                        outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init, self.pfile_bv,
                        '{:f}'.format(self.lv_ed_volume),'{:f}'.format(self.lv_ed_pressure),
-                       '{:f}'.format(self.rv_ed_pressure),'{:f}'.format(self.rv_ed_volume), 
+                       '{:f}'.format(self.rv_ed_pressure),'{:f}'.format(self.rv_ed_volume)], 
                        stdout=ofile, stderr=ofile)
 
         return p
