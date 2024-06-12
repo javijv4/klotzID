@@ -18,7 +18,7 @@ import time
 
 class KlotzID:
     def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, ed_pressure, ed_volume, inflation_type, ncores, 
-                 pfile_bv_init=None,pfile_bv=None,johns_export=False,
+                 pfile_bv_init=None,pfile_bv=None,alternate_export=False,
                  plot_intermediate=False, save_intermediate=False,ed_pressure_rv=0.0,ed_volume_rv=0.0):
         self.self_path = os.path.dirname(os.path.abspath(__file__))
         self.cheart_folder = os.path.dirname(pfile)
@@ -52,7 +52,7 @@ class KlotzID:
 
         self.pressure_var = pressure_var
         self.volume_var = volume_var
-        self.johns_export = johns_export
+        self.alternate_export = alternate_export
 
         self.times = sim_times
 
@@ -113,17 +113,15 @@ class KlotzID:
         self.it = 0
         start_time = time.time()
         while (error > 1e-3) and (self.it < self.max_iterations):
+
+            if self.inflation_type == 'volume_bivariable':
+                #print('Entering bivariable inflation')
+                new_params_1= self.optimize_lvrv(params)
+                params=new_params_1
+
             new_params, error = self.optimize_iteration_volume(params)
 
 
-            if self.inflation_type == 'volume_bivariable' and error < 1e-2:
-                print('Entering bivariable inflation with error = '+str(error))
-                new_params_1= self.optimize_lvrv(new_params)
-                new_params=new_params_1
-                ###print('BV error: '+str(error_bv))
-            elif self.inflation_type == 'volume_bivariable':
-                print('Curve error is too high, running Klotz inflate again')
-                print('Error: '+str(error))
 
 
 
@@ -354,7 +352,7 @@ class KlotzID:
                 kb=params[1]
 
                 
-                if self.johns_export:
+                if self.alternate_export:
                     file.write("Iteration {:d}, k={:f}, kb={:f}, par_LV={:f}, par_RV={:f}\n".format(self.it,params[0],params[1],params[2],params[3]))
 
                 else:
@@ -365,12 +363,31 @@ class KlotzID:
             else:
                 file.write("Iteration {:d}, k={:f}, kb={:f}, error = {:e}\n".format(self.it, params[0], params[1], error))
 
-    @staticmethod
-    def write_params(fname, params):
+    def write_params(self,fname, params):
         with open(fname, "w") as file:
-            # Writing data to a file
-            file.write("#k={:12.12f}\n".format(params[0]))
-            file.write("#kb={:12.12f}".format(params[1]))
+            
+            if self.inflation_type == 'volume_bivariable':
+
+                klv=params[0]*(1+params[2])
+                krv=params[0]*(1+params[3])
+                kb=params[1]
+
+                if self.alternate_export:
+                # Writing data to a file
+                    file.write("#k={:12.12f}\n".format(params[0]))
+                    file.write("#kb={:12.12f}\n".format(params[1]))
+                    file.write("#par_LV={:12.12f}\n".format(params[2]))
+                    file.write("#par_RV={:12.12f}".format(params[3]))
+
+                else:
+                    file.write("#k_lv={:12.12f}\n".format(klv))
+                    file.write("#k_rv={:12.12f}\n".format(krv))
+                    file.write("#kb={:12.12f}".format(kb))
+
+            else:
+
+                file.write("#k={:12.12f}\n".format(params[0]))
+                file.write("#kb={:12.12f}".format(params[1]))
 
 
     def run_cheart_inflation(self, params, outdir):

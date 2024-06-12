@@ -21,17 +21,23 @@ volume_var = 'LV_Vol'                   # Name of CH volume variable
 
 times = (1,100,1)                       # Time at which pressure_var and volume_var are output
 
+
+#################### Always check your P files!
+
+
+
 # ED values, left ventricle
 ed_pressure = 2.464647104639350 # kPa
 ed_volume = 188990.934787700913148  # mm3
 
+# Right ventricle
 ed_pres_rv=1.247110238886919
 ed_vol_rv=248863.804719955543987
 
 
 # Initial guess
-k0 = 1
-kb0 = 1
+k0 = .879914
+kb0 = .496598
 
 par_lv=0
 par_rv=0
@@ -44,6 +50,7 @@ klotzopt = KlotzID(pfile, pressure_var, volume_var, out_fldr, times,
                    pfile_bv_init,pfile_bv,
                    ed_volume_rv=ed_vol_rv,
                    ed_pressure_rv=ed_pres_rv,
+                   alternate_export=True,
                    plot_intermediate=True,      # Save a png of the pressure volume curve every iteration
                    save_intermediate=True)      # Save intermediate pressure, volume and parameters in an .npz file
                    
