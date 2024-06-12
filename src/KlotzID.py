@@ -139,23 +139,24 @@ class KlotzID:
         self.it = 0
         start_time = time.time()
         while (error > 1e-3) and (self.it < self.max_iterations):
-
+            
+            self.print_iteration(self.it)
             if self.inflation_type == 'volume_bivariable' or self.inflation_type == 'volume_variable':
                 #print('Entering bivariable inflation')
                 new_params_1= self.optimize_linear_variable(params)
                 params=new_params_1
 
             new_params, error = self.optimize_non_linear(params)
-
-
-
-
+            print('Finished iteration {:d} with error {:e}'.format(self.it, error))
+            print('Parameters found are k={:f} and kb={:f}'.format(new_params[0], new_params[1]))
 
             self.write_log(params, error)
 
             # update
             params = new_params
             self.it += 1
+
+            print()
 
         if self.it < self.max_iterations:
             end_time = time.time()
@@ -234,7 +235,7 @@ class KlotzID:
             pres_eps = np.append(0., pres_eps)
 
         if self.plot_intermediate:
-            self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.cheart_folder, self.out_fldr, self.it), vol, pres, params)
+            self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.cheart_folder, self.out_fldr, self.it), vol, pres, (k, kb, par_lv, par_rv))
 
         if self.save_intermediate:
             self.intermediate['vol'].append(vol)
@@ -249,7 +250,7 @@ class KlotzID:
 
         # Levenber-marquadt iteration
         g = self.compute_curve_difference(vol, pres)
-        kb_delta = self.LM_update(g, pres, pres_eps)
+        kb_delta = self.LM_update(g, pres, pres_eps, kb)
         kb += kb_delta
 
         # Compute error
@@ -262,8 +263,6 @@ class KlotzID:
             params = (k, kb, par_lv)
         else:
             params = (k, kb)
-
-        print('Optimized parameters k={:f} and kb={:f}'.format(params[0], params[1]))
 
         return params, error
 
@@ -278,7 +277,7 @@ class KlotzID:
         else:
             raise ValueError('This function is only for variable inflation')
 
-        p_bv = self.run_cheart_variable_inflation((k,kb),'tmp3') #uses new k and kb
+        p_bv = self.run_cheart_variable_inflation((k, kb),'tmp3') #uses new k and kb
         exit_code_bv = [p.wait() for p in ([p_bv])]
 
         times = (self.times[1], self.times[1], self.times[2])
@@ -363,7 +362,7 @@ class KlotzID:
         curve_error = np.linalg.norm(g)
 
         if plot:
-            self.plot_inflation_curve('{}/{}/klotz_fit.png'.format(self.cheart_folder, self.out_fldr), vol, pres, params)
+            self.plot_inflation_curve('{}/{}/klotz_fit.png'.format(self.cheart_folder, self.out_fldr), vol, pres, (k, kb, par_lv, par_rv))
         print('Final simulation results: ED error = {:f}, curve error {:f}'.format(ed_error, curve_error))
 
 
@@ -450,15 +449,16 @@ class KlotzID:
                        outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init,self.pfile_bv,
                        '{:f}'.format(self.lv_ed_volume),'{:f}'.format(self.lv_ed_pressure)]
         elif self.inflation_type=='volume_bivariable':
-            cmds = ['bash', '{}/run_bivariable_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb),
-                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init,self.pfile_bv,
-                       '{:f}'.format(self.lv_ed_volume),'{:f}'.format(self.lv_ed_pressure),
-                       '{:f}'.format(self.rv_ed_pressure),'{:f}'.format(self.rv_ed_volume)]
+            cmds = []
 
 
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
-            p = Popen(cmds,
+            p = Popen('bash', '{}/run_variable_inflation.sh'.format(self.self_path), 
+                      '{:f}'.format(k), '{:f}'.format(kb),
+                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init, self.pfile_bv,
+                       '{:f}'.format(self.lv_ed_volume),'{:f}'.format(self.lv_ed_pressure),
+                       '{:f}'.format(self.rv_ed_pressure),'{:f}'.format(self.rv_ed_volume), 
                        stdout=ofile, stderr=ofile)
 
         return p
@@ -472,6 +472,12 @@ class KlotzID:
         plt.xlabel('Volume [ml]')
         plt.ylabel('Pressure [kPa]')
         plt.savefig(fname, bbox_inches='tight')
+
+
+    def print_iteration(self, it):
+        print()
+        print('-------------------------------------------')
+        print('ITERATION {:d}'.format(self.it))
 
 
 
