@@ -17,7 +17,7 @@ import time
 
 
 class KlotzID:
-    def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, lv_ed_pressure, lv_ed_volume, inflation_type, ncores, 
+    def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, lv_ed_pressure, lv_ed_volume, inflation_type, ncores,
                  constraint_vars=None, pfile_bv_init=None,pfile_bv=None,alternate_export=False,
                  plot_intermediate=False, save_intermediate=False,rv_ed_pressure=0.0,rv_ed_volume=0.0):
         self.self_path = os.path.dirname(os.path.abspath(__file__))
@@ -47,7 +47,7 @@ class KlotzID:
             self.pars=constraint_vars
             if rv_ed_pressure == 0.0 or rv_ed_volume == 0.0:
                 raise ValueError("For bivariable inflation, ED pressure and volume for the RV must be provided")
-            
+
         elif inflation_type=='volume_variable':
             # Correct times to start from the second time point
             sim_times = (sim_times[0]+sim_times[2], sim_times[1], sim_times[2])
@@ -62,7 +62,7 @@ class KlotzID:
         else:
             pass
 
-        
+
         # Output path
         self.out_fldr = out_fldr
         if not os.path.exists('{}/{}'.format(self.cheart_folder, out_fldr)):
@@ -96,7 +96,7 @@ class KlotzID:
         self.logfile = 'klotzid.log'
 
 
-    def pre_clean(self):
+    def prepare(self):
         # Creating folders
 
         if not os.path.exists('{}/tmp1'.format(self.cheart_folder)):
@@ -124,7 +124,7 @@ class KlotzID:
 
 
     def optimize(self, params, post_clean=False):
-        self.pre_clean()
+        self.prepare()
 
         # Checking number of parameters
         if self.inflation_type == 'volume_bivariable':
@@ -161,7 +161,7 @@ class KlotzID:
             end_time = time.time()
             print('Optimization succesful in {:d} iterations and {:2.3f} s'.format(self.it, end_time-start_time))
             print('Parameters found are k={:f} and kb={:f}'.format(params[0], params[1]))
-            
+
             if self.inflation_type=='volume_bivariable':
                 print('LV/RV params are par_lv={:f} and par_rv={:f}'.format(params[2], params[3]))
 
@@ -183,7 +183,7 @@ class KlotzID:
             except TypeError:
                 print('Type error in saving intermediates!')
                 int_params=np.array([0,0,0,0])
-                
+
             np.savez('{}/{}/intermediate_results.npz'.format(self.cheart_folder, self.out_fldr), volume=int_vol, pressure=int_pres, params=int_params)
 
         if post_clean:
@@ -192,7 +192,7 @@ class KlotzID:
 
 
     def optimize_non_linear(self, params):
-        
+
         # Grabbing parameters
         if self.inflation_type=='volume_bivariable':
             k, kb, par_lv, par_rv = params
@@ -240,14 +240,6 @@ class KlotzID:
             self.intermediate['vol'].append(vol)
             self.intermediate['pres'].append(pres)
             self.intermediate['params'].append(params)
-            
-        # Parameter update
-        if self.inflation_type=='volume_bivariable':
-            k, kb, par_lv, par_rv = params
-        elif self.inflation_type=='volume_variable':
-            k, kb, par_lv = params
-        else:
-            k,kb = params
 
         # Linear correction
         k_delta = self.lv_ed_pressure/pres[-1]
@@ -300,14 +292,14 @@ class KlotzID:
             params_full=(k, kb, par_lv)
             print('Variable inflation found par_lv={:f}'.format(par_lv))
 
-        
+
 
 
         return params_full
 
 
 
-    def LM_update(self, g, pres, pres_eps):
+    def LM_update(self, g, pres, pres_eps, kb):
         # Compute jacobian (forward differences)
         J = (pres_eps - pres)/self.eps
         J = J[self.data_mask,None]       # Making it a matrix
@@ -317,6 +309,7 @@ class KlotzID:
         rhs = J.T@g
 
         delta = np.linalg.solve(mat, rhs)
+
 
         # Update lam
         gnorm = np.linalg.norm(g)
@@ -329,6 +322,12 @@ class KlotzID:
                 self.lam *= fac
 
         self.gnorm = gnorm
+
+        # If np.abs(delta) > 1, divide by half
+        while kb + delta < 0:
+            print('Warning: Negative kb found. Dividing delta by 2')
+            delta = delta/2
+
 
         return delta[0]
 
@@ -372,7 +371,7 @@ class KlotzID:
         vol0 = vol[0]
         voled = vol[-1]
         vol_lim = (voled-vol0)/3 + vol0
-        
+
         self.data_mask = vol > vol_lim
         vol_cut = vol[self.data_mask]
         pres_cut = pres[self.data_mask]
@@ -391,7 +390,7 @@ class KlotzID:
                 krv=params[0]*(1+params[3])
                 kb=params[1]
 
-                
+
                 if self.alternate_export:
                     file.write("Iteration {:d}, k={:f}, kb={:f}, par_LV={:f}, par_RV={:f}\n".format(self.it,params[0],params[1],params[2],params[3]))
 
@@ -405,7 +404,7 @@ class KlotzID:
 
     def write_params(self,fname, params):
         with open(fname, "w") as file:
-            
+
             if self.inflation_type == 'volume_bivariable':
 
                 klv=params[0]*(1+params[2])
@@ -435,7 +434,7 @@ class KlotzID:
 
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
-            p = Popen(['bash', '{}/run_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb), 
+            p = Popen(['bash', '{}/run_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb),
                        '{:f}'.format(par_lv),'{:f}'.format(par_rv),
                        outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile,'{:f}'.format(self.lv_ed_volume)],
                        stdout=ofile, stderr=ofile)
