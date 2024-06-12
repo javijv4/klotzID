@@ -17,30 +17,48 @@ import time
 
 
 class KlotzID:
-    def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, ed_pressure, ed_volume, inflation_type, ncores, 
-                 pfile_bv_init=None,pfile_bv=None,alternate_export=False,
-                 plot_intermediate=False, save_intermediate=False,ed_pressure_rv=0.0,ed_volume_rv=0.0):
+    def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, lv_ed_pressure, lv_ed_volume, inflation_type, ncores, 
+                 constraint_vars=None, pfile_bv_init=None,pfile_bv=None,alternate_export=False,
+                 plot_intermediate=False, save_intermediate=False,rv_ed_pressure=0.0,rv_ed_volume=0.0):
         self.self_path = os.path.dirname(os.path.abspath(__file__))
         self.cheart_folder = os.path.dirname(pfile)
         if self.cheart_folder == '': self.cheart_folder = '.'
         self.ncores = ncores
         self.inflation_type = inflation_type
-        assert (inflation_type == 'volume') or (inflation_type == 'inverse_volume') or (inflation_type == 'volume_bivariable'), 'Non-recognized inflation type'
+        assert (inflation_type == 'volume') or (inflation_type == 'inverse_volume') or \
+            (inflation_type == 'volume_bivariable') or (inflation_type == 'volume_variable'), 'Non-recognized inflation type'
 
         self.pfile = os.path.basename(pfile)
 
         if inflation_type=='volume_bivariable':
+            # Correct times to start from the second time point
+            sim_times = (sim_times[0]+sim_times[2], sim_times[1], sim_times[2])
+
             if pfile_bv_init is None or pfile_bv is None:
-                raise ValueError("Both bivariable P files must be provided if lvrv is True")
+                raise ValueError('For bivariable inflation, both bivariable P files must be provided')
             self.pfile_bv_init = pfile_bv_init
             self.pfile_bv = pfile_bv
-            self.ed_pressure_rv = ed_pressure_rv
-            self.ed_volume_rv = ed_volume_rv
-            self.pars=(('par_LV','par_RV'))
-
-            if ed_pressure_rv == 0.0 or ed_volume_rv == 0.0:
+            self.rv_ed_pressure = rv_ed_pressure
+            self.rv_ed_volume = rv_ed_volume
+            if constraint_vars is None:
+                raise ValueError("For bivariable inflation, constraint variables must be provided")
+            if len(constraint_vars) != 2:
+                raise ValueError("For bivariable inflation, two constraint variables must be provided")
+            self.pars=constraint_vars
+            if rv_ed_pressure == 0.0 or rv_ed_volume == 0.0:
                 raise ValueError("For bivariable inflation, ED pressure and volume for the RV must be provided")
+            
+        elif inflation_type=='volume_variable':
+            # Correct times to start from the second time point
+            sim_times = (sim_times[0]+sim_times[2], sim_times[1], sim_times[2])
 
+            if pfile_bv_init is None or pfile_bv is None:
+                raise ValueError('For variable inflation, both bivariable P files must be provided')
+            self.pfile_bv_init = pfile_bv_init
+            self.pfile_bv = pfile_bv
+            if len(constraint_vars) != 1:
+                raise ValueError("For variable inflation, one constraint variable must be provided")
+            self.pars=constraint_vars
         else:
             pass
 
@@ -57,9 +75,9 @@ class KlotzID:
         self.times = sim_times
 
         # Compute target curve
-        self.ed_pressure = ed_pressure  # kPa
-        self.ed_volume = ed_volume # mm3
-        self.klotz_volume, self.klotz_pressure = klotz_curve(ed_volume, ed_pressure)
+        self.lv_ed_pressure = lv_ed_pressure  # kPa
+        self.lv_ed_volume = lv_ed_volume # mm3
+        self.klotz_volume, self.klotz_pressure = klotz_curve(lv_ed_volume, lv_ed_pressure)
         self.klotz_function = interp1d(self.klotz_volume, self.klotz_pressure, fill_value='extrapolate')
 
         # Optimization parameters
@@ -108,18 +126,26 @@ class KlotzID:
     def optimize(self, params, post_clean=False):
         self.pre_clean()
 
+        # Checking number of parameters
+        if self.inflation_type == 'volume_bivariable':
+            assert len(params) == 4, 'For bivariable inflation, 4 parameters must be provided'
+        elif self.inflation_type == 'volume_variable':
+            assert len(params) == 3, 'For variable inflation, 3 parameters must be provided'
+        else:
+            assert len(params) == 2, 'For volume inflation, 2 parameters must be provided'
+
         # Initializing variables
         error = 1e3
         self.it = 0
         start_time = time.time()
         while (error > 1e-3) and (self.it < self.max_iterations):
 
-            if self.inflation_type == 'volume_bivariable':
+            if self.inflation_type == 'volume_bivariable' or self.inflation_type == 'volume_variable':
                 #print('Entering bivariable inflation')
-                new_params_1= self.optimize_lvrv(params)
+                new_params_1= self.optimize_linear_variable(params)
                 params=new_params_1
 
-            new_params, error = self.optimize_iteration_volume(params)
+            new_params, error = self.optimize_non_linear(params)
 
 
 
@@ -146,10 +172,10 @@ class KlotzID:
             int_vol = np.vstack(self.intermediate['vol'])
             int_pres = np.vstack(self.intermediate['pres'])
 
-            print('Params data')
-            print(self.intermediate['params'])
-            print('Type of params data')
-            print(type(self.intermediate['params']))
+            # print('Params data')
+            # print(self.intermediate['params'])
+            # print('Type of params data')
+            # print(type(self.intermediate['params']))
 
 
             try:
@@ -165,22 +191,35 @@ class KlotzID:
         return params
 
 
-    def optimize_iteration_volume(self, params):
+    def optimize_non_linear(self, params):
         
-        print('Running simulation with parameters k='+str(params[0])+' and kb='+str(params[1]))
-        
+        # Grabbing parameters
         if self.inflation_type=='volume_bivariable':
-            print('Bivariable parameters par_lv='+str(params[2])+' and par_rv='+str(params[3]))
-            k, kb,par_lv,par_rv = params
-        
+            k, kb, par_lv, par_rv = params
+        elif self.inflation_type=='volume_variable':
+            k, kb, par_lv = params
+            par_rv=0
         else:
             k,kb = params
             par_lv=0
             par_rv=0
-        
 
-        p1 = self.run_cheart_inflation((k, kb,par_lv,par_rv), 'tmp1')
-        p2 = self.run_cheart_inflation((k, kb+self.eps,par_lv,par_rv), 'tmp2')
+        # Update k if variable used
+        if self.inflation_type=='volume_bivariable' or self.inflation_type=='volume_variable':
+            print('Updating k using variable inflation par_LV')
+            k = (1+par_lv)
+            par_lv = 0
+            if self.inflation_type=='volume_bivariable':
+                par_rv = par_rv/k - 1
+
+        print('Running simulation with parameters k='+str(k)+' and kb='+str(kb))
+        if self.inflation_type=='volume_bivariable':
+            print('Bivariable parameters par_lv='+str(par_lv)+' and par_rv='+str(par_rv))
+        elif self.inflation_type=='volume_variable':
+            print('Variable parameters par_lv='+str(par_lv))
+
+        p1 = self.run_cheart_inflation((k, kb, par_lv, par_rv), 'tmp1')
+        p2 = self.run_cheart_inflation((k, kb+self.eps, par_lv, par_rv), 'tmp2')
         exit_codes = [p.wait() for p in (p1, p2)]
 
         # Load results
@@ -190,7 +229,7 @@ class KlotzID:
 
         if self.inflation_type == 'inverse_volume':
             vol = vol[::-1]
-            vol = np.append(vol, self.ed_volume)
+            vol = np.append(vol, self.lv_ed_volume)
             pres = np.append(0., pres)
             pres_eps = np.append(0., pres_eps)
 
@@ -204,16 +243,17 @@ class KlotzID:
             
         # Parameter update
         if self.inflation_type=='volume_bivariable':
-            k, kb,par_lv,par_rv = params
-        
+            k, kb, par_lv, par_rv = params
+        elif self.inflation_type=='volume_variable':
+            k, kb, par_lv = params
         else:
             k,kb = params
 
         # Linear correction
-        k_delta = self.ed_pressure/pres[-1]
+        k_delta = self.lv_ed_pressure/pres[-1]
         k = k*k_delta
-        pres = pres*self.ed_pressure/pres[-1]
-        pres_eps = pres_eps*self.ed_pressure/pres_eps[-1]
+        pres = pres*self.lv_ed_pressure/pres[-1]
+        pres_eps = pres_eps*self.lv_ed_pressure/pres_eps[-1]
 
         # Levenber-marquadt iteration
         g = self.compute_curve_difference(vol, pres)
@@ -224,54 +264,43 @@ class KlotzID:
         error = np.abs(kb_delta) + np.abs(k_delta-1)
 
         # Return new parameters
-        params = (k, kb)
-        print(params)
-
-        #if self.lvrv:
-
-        #    print('Running bivariable inflation')
-
-        #    p_bv = self.run_cheart_bvar_inflation((k,kb),'tmp3') #uses new k and kb
-        #    exit_code_bv = [p.wait() for p in ([p_bv])]
-
-        #    par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[0]), [100,100,1])
-        #    par_rv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[1]), [100,100,1])
-        #    print(par_lv)
-
-        #else:
-        #    par_lv=1
-        #    par_rv=1
-
-
-
-
-        #print('LV/RV params:')
-        #print(par_lv,par_rv)
-
         if self.inflation_type=='volume_bivariable':
-            params_full=(k,kb,par_lv,par_rv)
+            params = (k, kb, par_lv, par_rv)
+        elif self.inflation_type=='volume_variable':
+            params = (k, kb, par_lv)
         else:
-            params_full=(k,kb)
+            params = (k, kb)
 
-        return params_full, error
+        print('Optimized parameters k={:f} and kb={:f}'.format(params[0], params[1]))
+
+        return params, error
 
 
-    def optimize_lvrv(self, params):
-        k, kb,par_lv,par_rv = params
+    def optimize_linear_variable(self, params):
+        if self.inflation_type == 'volume_variable':
+            print('Running variable inflation')
+            k, kb, par_lv = params
+        elif self.inflation_type == 'volume_bivariable':
+            print('Running bivariable inflation')
+            k, kb, par_lv, par_rv = params
+        else:
+            raise ValueError('This function is only for variable inflation')
 
-        print('Running bivariable inflation')
-    
-        p_bv = self.run_cheart_bvar_inflation((k,kb),'tmp3') #uses new k and kb
+        p_bv = self.run_cheart_variable_inflation((k,kb),'tmp3') #uses new k and kb
         exit_code_bv = [p.wait() for p in ([p_bv])]
 
-        par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[0]), [100,100,1])[0]
-        par_rv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[1]), [100,100,1])[0]
+        times = (self.times[1], self.times[1], self.times[2])
+        par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[0]), times)[-1]
 
-        print('LV/RV params:')
-        print(par_lv,par_rv)
+        if self.inflation_type == 'volume_bivariable':
+            par_rv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[1]), times)[-1]
+            params_full=(k, kb, par_lv, par_rv)
+            print('Varibale inflation found par_lv={:f} and par_rv={:f}'.format(par_lv, par_rv))
+        else:
+            params_full=(k, kb, par_lv)
+            print('Variable inflation found par_lv={:f}'.format(par_lv))
 
-
-        params_full=(k,kb,par_lv,par_rv)
+        
 
 
         return params_full
@@ -305,8 +334,19 @@ class KlotzID:
 
 
     def run_last_simulation(self, params, plot=True):
+        # Grabbing parameters
+        if self.inflation_type=='volume_bivariable':
+            k, kb, par_lv, par_rv = params
+        elif self.inflation_type=='volume_variable':
+            k, kb, par_lv = params
+            par_rv=0
+        else:
+            k,kb = params
+            par_lv=0
+            par_rv=0
+
         print('Running simulation with optimized parameters')
-        p1 = self.run_cheart_inflation(params, self.out_fldr)
+        p1 = self.run_cheart_inflation((k, kb, par_lv, par_rv), self.out_fldr)
         p1.wait()
 
         # Load results
@@ -315,10 +355,10 @@ class KlotzID:
 
         if self.inflation_type == 'inverse_volume':
             vol = vol[::-1]
-            vol = np.append(vol, self.ed_volume)
+            vol = np.append(vol, self.lv_ed_volume)
             pres = np.append(0., pres)
 
-        ed_error = np.abs(self.ed_pressure/pres[-1]-1)
+        ed_error = np.abs(self.lv_ed_pressure/pres[-1]-1)
 
         g = self.compute_curve_difference(vol, pres)
         curve_error = np.linalg.norm(g)
@@ -391,27 +431,35 @@ class KlotzID:
 
 
     def run_cheart_inflation(self, params, outdir):
-        k, kb,par_lv,par_rv = params
+        k, kb, par_lv, par_rv = params
 
         # Run cheart
-
         with open('{}.log'.format(outdir), 'w') as ofile:
-            p = Popen(['bash', '{}/run_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb), '{:f}'.format(par_lv),'{:f}'.format(par_rv),
-                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile,'{:f}'.format(self.ed_volume)],
+            p = Popen(['bash', '{}/run_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb), 
+                       '{:f}'.format(par_lv),'{:f}'.format(par_rv),
+                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile,'{:f}'.format(self.lv_ed_volume)],
                        stdout=ofile, stderr=ofile)
 
         return p
 
 
-    def run_cheart_bvar_inflation(self, params, outdir):
+    def run_cheart_variable_inflation(self, params, outdir):
         k, kb = params
+
+        if self.inflation_type=='volume_variable':
+            cmds = ['bash', '{}/run_variable_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb),
+                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init,self.pfile_bv,
+                       '{:f}'.format(self.lv_ed_volume),'{:f}'.format(self.lv_ed_pressure)]
+        elif self.inflation_type=='volume_bivariable':
+            cmds = ['bash', '{}/run_bivariable_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb),
+                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init,self.pfile_bv,
+                       '{:f}'.format(self.lv_ed_volume),'{:f}'.format(self.lv_ed_pressure),
+                       '{:f}'.format(self.rv_ed_pressure),'{:f}'.format(self.rv_ed_volume)]
+
 
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
-            p = Popen(['bash', '{}/run_bivariable.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb),
-                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init,self.pfile_bv,
-                       '{:f}'.format(self.ed_volume),'{:f}'.format(self.ed_pressure),
-                       '{:f}'.format(self.ed_volume_rv),'{:f}'.format(self.ed_pressure_rv)],
+            p = Popen(cmds,
                        stdout=ofile, stderr=ofile)
 
         return p

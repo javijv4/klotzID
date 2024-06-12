@@ -13,9 +13,7 @@ edp_rv=$11
 
 
 cd ${folder}
-mkdir -p ./tmp3/
-mkdir -p ./tmp3/init/
 
-mpirun -np ${ncores} cheartsolver.out ${pfile1} -\#k=${k} -\#kb=${kb} 
+mpirun -np ${ncores} cheartsolver.out ${pfile1} -\#k=${k} -\#kb=${kb} -\#outdir=${outdir}
 
 mpirun -np ${ncores} cheartsolver.out ${pfile2} -\#k=${k} -\#kb=${kb} -\#outdir=${outdir}
