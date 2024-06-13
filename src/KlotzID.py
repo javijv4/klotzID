@@ -152,7 +152,7 @@ class KlotzID:
                 params=new_params_1
 
             new_params, error = self.optimize_non_linear(params)
-            print('Finished iteration {:d} with error {:e}'.format(self.it, error))
+            print('Finished iteration {:d} with update norm {:e}'.format(self.it, error))
             print('Parameters found are k={:f} and kb={:f}'.format(new_params[0], new_params[1]))
 
             self.write_log(params, error)
@@ -170,6 +170,8 @@ class KlotzID:
 
             if self.inflation_type=='volume_bivariable':
                 print('LV/RV params are par_lv={:f} and par_rv={:f}'.format(params[2], params[3]))
+            elif self.inflation_type=='volume_variable':
+                print('LV params are par_lv={:f}'.format(params[2]))
 
         else:
             print('Optimization failed.')
@@ -291,7 +293,7 @@ class KlotzID:
         if self.inflation_type == 'volume_bivariable':
             par_rv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[1]), times)[-1]
             params_full=(k, kb, par_lv, par_rv)
-            print('Varibale inflation found par_lv={:f} and par_rv={:f}'.format(par_lv, par_rv))
+            print('Variable inflation found par_lv={:f} and par_rv={:f}'.format(par_lv, par_rv))
         else:
             params_full=(k, kb, par_lv)
             print('Variable inflation found par_lv={:f}'.format(par_lv))
@@ -425,6 +427,20 @@ class KlotzID:
                 else:
                     file.write("#k_lv={:12.12f}\n".format(klv))
                     file.write("#k_rv={:12.12f}\n".format(krv))
+                    file.write("#kb={:12.12f}".format(kb))
+
+            elif self.inflation_type == 'volume_variable':
+                klv=params[0]*(1+params[2])
+                kb=params[1]
+
+                if self.alternate_export:
+                # Writing data to a file
+                    file.write("#k={:12.12f}\n".format(params[0]))
+                    file.write("#kb={:12.12f}\n".format(params[1]))
+                    file.write("#par_LV={:12.12f}".format(params[2]))
+
+                else:
+                    file.write("#k={:12.12f}\n".format(klv))
                     file.write("#kb={:12.12f}".format(kb))
 
             else:
