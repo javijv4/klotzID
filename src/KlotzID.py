@@ -37,6 +37,8 @@ class KlotzID:
             # Correct times to start from the second time point
             sim_times = (sim_times[0]+sim_times[2], sim_times[1], sim_times[2])
 
+            
+
             if pfile_bv_init is None or pfile_bv is None:
                 raise ValueError('For bivariable inflation, both bivariable P files must be provided')
             self.pfile_bv_init = pfile_bv_init
@@ -215,10 +217,12 @@ class KlotzID:
         # Update k if variable used
         if self.inflation_type=='volume_bivariable' or self.inflation_type=='volume_variable':
             print('Updating k using variable inflation par_LV')
-            k = k*(1+par_lv)
+            kold=k
+            k = k*(1+par_lv)            
             par_lv = 0
             if self.inflation_type=='volume_bivariable':
-                par_rv = par_rv/k - 1
+                par_rv_eff=kold*(1+par_rv)
+                par_rv = par_rv_eff/k - 1
 
         print('Running simulation with parameters k='+str(k)+' and kb='+str(kb))
         if self.inflation_type=='volume_bivariable':
