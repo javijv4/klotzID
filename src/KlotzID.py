@@ -20,9 +20,9 @@ class KlotzID:
     def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, 
                  lv_ed_pressure, lv_ed_volume, 
                  inflation_type, ncores,
+                 rv_ed_pressure=0.0,rv_ed_volume=0.0,
                  constraint_vars=None, pfile_bv_init=None,pfile_bv=None,alternate_export=False,
-                 plot_intermediate=False, save_intermediate=False,
-                 rv_ed_pressure=0.0,rv_ed_volume=0.0):
+                 plot_intermediate=False, save_intermediate=False):
         self.self_path = os.path.dirname(os.path.abspath(__file__))
         self.cheart_folder = os.path.dirname(pfile)
         if self.cheart_folder == '': self.cheart_folder = '.'
@@ -469,7 +469,7 @@ class KlotzID:
         with open('{}.log'.format(outdir), 'w') as ofile:
             p = Popen(['bash', '{}/run_variable_inflation.sh'.format(self.self_path), 
                       '{:f}'.format(k), '{:f}'.format(kb),
-                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile_bv_init, self.pfile_bv,
+                       outdir, '{:d}'.format(2*self.ncores), self.cheart_folder, self.pfile_bv_init, self.pfile_bv,
                        '{:f}'.format(self.lv_ed_volume),'{:f}'.format(self.lv_ed_pressure),
                        '{:f}'.format(self.rv_ed_pressure),'{:f}'.format(self.rv_ed_volume)], 
                        stdout=ofile, stderr=ofile)
