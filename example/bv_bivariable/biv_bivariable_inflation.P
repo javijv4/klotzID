@@ -37,7 +37,7 @@
 #V0_rv=147159.01436344426
 
 
-#initdir=./tmp3/init/
+#initdir=./tmp3/
 
 
 

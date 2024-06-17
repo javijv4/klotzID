@@ -6,3 +6,6 @@ tmp*
 out*
 .vscode
 work/
+./example/bv_bivariable/*.log
+./example/bv_bivariable/mesh/out/
+./example/bv_bivariable/archive/

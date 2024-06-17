@@ -36,8 +36,8 @@ ed_vol_rv=248863.804719955543987
 
 
 # Initial guess
-k0 = .879914
-kb0 = .496598
+k0 = 1.0
+kb0 = 1.0
 
 par_lv=0
 par_rv=0
@@ -47,14 +47,15 @@ params0 = (k0, kb0,par_lv,par_rv)
 # Optimization
 klotzopt = KlotzID(pfile, pressure_var, volume_var, out_fldr, times, 
                    ed_pressure, ed_volume, inflation_type, ncores, 
-                   pfile_bv_init,pfile_bv,
-                   ed_volume_rv=ed_vol_rv,
-                   ed_pressure_rv=ed_pres_rv,
+                   pfile_bv_init=pfile_bv_init,pfile_bv=pfile_bv,
+                   rv_ed_volume=ed_vol_rv,
+                   rv_ed_pressure=ed_pres_rv,
+                   constraint_vars=['par_LV','par_RV'],
                    alternate_export=True,
                    plot_intermediate=True,      # Save a png of the pressure volume curve every iteration
                    save_intermediate=True)      # Save intermediate pressure, volume and parameters in an .npz file
                    
-klotzopt.max_iterations = 20                    # Setting max number of iterations
+klotzopt.max_iterations = 40                    # Setting max number of iterations
 params = klotzopt.optimize(params0)
 klotzopt.run_last_simulation(params)
 klotzopt.write_params(out_fname, params)

@@ -37,6 +37,8 @@ class KlotzID:
             # Correct times to start from the second time point
             sim_times = (sim_times[0]+sim_times[2], sim_times[1], sim_times[2])
 
+            
+
             if pfile_bv_init is None or pfile_bv is None:
                 raise ValueError('For bivariable inflation, both bivariable P files must be provided')
             self.pfile_bv_init = pfile_bv_init
