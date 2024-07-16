@@ -299,7 +299,7 @@ class KlotzID:
         else:
             raise ValueError('This function is only for variable inflation')
 
-        p_bv = self.run_cheart_variable_inflation((k, kb),'tmp3') #uses new k and kb
+        p_bv = self.run_cheart_variable_inflation(params,'tmp3') #uses new k and kb
         exit_code_bv = [p.wait() for p in ([p_bv])]
 
         times = (self.times[1], self.times[1], self.times[2])
@@ -478,12 +478,13 @@ class KlotzID:
 
 
     def run_cheart_variable_inflation(self, params, outdir):
-        k, kb = params
+        k, kb, par_lv, par_rv = params
         
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
             p = Popen(['bash', '{}/run_variable_inflation.sh'.format(self.self_path), 
                       '{:f}'.format(k), '{:f}'.format(kb),
+                       '{:f}'.format(par_lv),'{:f}'.format(par_rv),
                        outdir, '{:d}'.format(2*self.ncores), self.cheart_folder, self.pfile_bv_init, self.pfile_bv,
                        '{:f}'.format(self.lv_ed_volume),'{:f}'.format(self.lv_ed_pressure),
                        '{:f}'.format(self.rv_ed_pressure),'{:f}'.format(self.rv_ed_volume)], 
