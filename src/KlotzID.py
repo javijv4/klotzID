@@ -105,7 +105,6 @@ class KlotzID:
 
     def prepare(self):
         # Creating folders
-
         if not os.path.exists('{}/tmp1'.format(self.cheart_folder)):
             os.mkdir('{}/tmp1'.format(self.cheart_folder))
         if not os.path.exists('{}/tmp2'.format(self.cheart_folder)):
@@ -168,9 +167,9 @@ class KlotzID:
 
         # For bvariable inflation I need to run one more inflation to account for LV-RV interaction
         if self.inflation_type=='volume_bivariable':
-            k, kb = params[0], params[1]
+            k, kb, par_lv, par_rv = params
             print('Running variable inflation with optimized parameters k={:f} and kb={:f}'.format(k, kb))
-            p_bv = self.run_cheart_variable_inflation((k, kb),'tmp3') #uses new k and kb
+            p_bv = self.run_cheart_variable_inflation(params,'tmp3') #uses new k and kb
             p_bv.wait()
 
             times = (self.times[1], self.times[1], self.times[2])
@@ -303,16 +302,23 @@ class KlotzID:
         exit_code_bv = [p.wait() for p in ([p_bv])]
 
         times = (self.times[1], self.times[1], self.times[2])
-        par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[0]), times)[-1]
 
-        if self.inflation_type == 'volume_bivariable':
-            par_rv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[1]), times)[-1]
-            params_full=(k, kb, par_lv, par_rv)
-            print('Variable inflation found par_lv={:f} and par_rv={:f}'.format(par_lv, par_rv))
-        else:
-            params_full=(k, kb, par_lv)
-            print('Variable inflation found par_lv={:f}'.format(par_lv))
+        try:
+            par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[0]), times)[-1]
 
+            if self.inflation_type == 'volume_bivariable':
+                par_rv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[1]), times)[-1]
+                params_full=(k, kb, par_lv, par_rv)
+                print('Variable inflation found par_lv={:f} and par_rv={:f}'.format(par_lv, par_rv))
+            else:
+                params_full=(k, kb, par_lv)
+                print('Variable inflation found par_lv={:f}'.format(par_lv))
+        except:
+            print('Variable inflation failed. Keeping previous parameters')
+            if self.inflation_type == 'volume_bivariable':
+                params_full=(k, kb, par_lv, par_rv)
+            else:
+                params_full=(k, kb, par_lv)
 
 
 
