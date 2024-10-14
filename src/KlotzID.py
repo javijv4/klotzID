@@ -22,7 +22,7 @@ class KlotzID:
                  inflation_type, ncores,
                  rv_ed_pressure=0.0,rv_ed_volume=0.0,
                  constraint_vars=None, pfile_bv_init=None,pfile_bv=None,alternate_export=False,
-                 plot_intermediate=False, save_intermediate=False):
+                 plot_intermediate=False, save_intermediate=False,use_inflate_pfile=True):
         self.self_path = os.path.dirname(os.path.abspath(__file__))
         self.cheart_folder = os.path.dirname(pfile)
         if self.cheart_folder == '': self.cheart_folder = '.'
@@ -103,6 +103,8 @@ class KlotzID:
         self.logfile = 'klotzid.log'
         self.inflate_file='inflate_values.P'
 
+        self.use_inflate_pfile=use_inflate_pfile
+
 
     def prepare(self):
         # Creating folders
@@ -120,18 +122,21 @@ class KlotzID:
             pass
 
         # Removing old inflate value file
-        try:
-            os.remove(self.logfile)
-        except OSError:
-            pass
 
-        # write values to new inflate value file
-        inf_file=open(self.inflate_file,"w")
-        inf_file.write("#LV_EDP="+str(self.lv_ed_pressure)+'\n')
-        inf_file.write("#LV_EDV="+str(self.lv_ed_volume)+'\n')
-        inf_file.write("#RV_EDP="+str(self.rv_ed_pressure)+'\n')
-        inf_file.write("#RV_EDV="+str(self.rv_ed_volume)+'\n')
-        inf_file.close()
+        if self.use_inflate_pfile:
+            try:
+                os.remove(self.logfile)
+            except OSError:
+                pass
+
+            # write values to new inflate value file
+            inf_file=open(self.inflate_file,"w")
+            inf_file.write("#LV_EDP="+str(self.lv_ed_pressure)+'\n')
+            inf_file.write("#LV_EDV="+str(self.lv_ed_volume)+'\n')
+            inf_file.write("#RV_EDP="+str(self.rv_ed_pressure)+'\n')
+            inf_file.write("#RV_EDV="+str(self.rv_ed_volume)+'\n')
+            inf_file.close()
+
 
 
     def post_clean(self):

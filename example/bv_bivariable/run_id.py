@@ -53,7 +53,8 @@ klotzopt = KlotzID(pfile, pressure_var, volume_var, out_fldr, times,
                    constraint_vars=['par_LV','par_RV'],
                    alternate_export=True,
                    plot_intermediate=True,      # Save a png of the pressure volume curve every iteration
-                   save_intermediate=True)      # Save intermediate pressure, volume and parameters in an .npz file
+                   save_intermediate=True,  # Save intermediate pressure, volume and parameters in an .npz file
+                   use_inflate_pfile=True)     
                    
 klotzopt.max_iterations = 20                    # Setting max number of iterations
 params = klotzopt.optimize(params0)
