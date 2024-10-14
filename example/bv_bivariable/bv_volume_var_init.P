@@ -1,0 +1,107 @@
+
+
+!include={inflate_values.P}
+
+#LV_V0=105185.24017119760
+#RV_V0=147159.01436344426
+
+#meshdir = ./mesh
+#datadir = ./mesh/data
+!SetOutputPath={#outdir}
+
+#st=1
+#et=1
+#dt=0.01
+
+#exportrate = 1
+
+#lv_endo=1
+#rv_endo=2
+
+
+% --- Solver Definition ----------------------------------------------
+!DefSolverGroup={SG1|TimeStepping|Matrix}
+  !DefSolverSubGroup={SG1|SEQ_FP_LINESEARCH|Matrix|ScaleFirstResidual[1000]}
+  !SetSolverGroup={SG1|L2TOL|1e-8}
+  !SetSolverGroup={SG1|ITERATION|30}
+  !SetSolverGroup={SG1|LINESEARCHITER|10} 
+
+!DefSolverMatrix={Matrix|SOLVER_MUMPS|solid|lvendo|rvendo}
+  !SetSolverMatrix={Matrix |ordering      |parallel}
+  !SetSolverMatrix={Matrix | SolverMatrixCalculation | evaluate_every_build}
+
+!DefTimeStepScheme={TimeStepping}
+   #st   #et   #dt
+
+
+% --- Basis function definition --------------------------------------
+!UseBasis={LinBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS6}
+!UseBasis={ConstBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE0|KEAST_LYNESS6}
+
+
+% --- Topology -------------------------------------------------------
+!DefTopology={TP0 | #meshdir/bv_const_disc | ConstBasis}
+  !SetTopology={TP0 | MakeDiscontinuous}
+!DefTopology={TP1 | #meshdir/bv_model | LinBasis}
+!DefTopology={TPfibers | #meshdir/bv_lin_disc | LinBasis}
+  !SetTopology={TPfibers | MakeDiscontinuous}
+
+
+% --- Interfaces -----------------------------------------------------
+!DefInterface={OneToOne|TP1|TP0|TPfibers}
+
+
+% --- Variables ------------------------------------------------------
+!DefVariablePointer={Space| TP1 | #meshdir/bv_model | 3}
+!DefVariablePointer={Disp| TP1 | 3}
+!DefVariablePointer={Fibers| TPfibers | #datadir/fiber.field|9}
+!DefVariablePointer={phi | TP0 | #meshdir/region.FE | 1}
+
+
+% --- Other ------------------------------------------------------------
+!SetExportFrequency={Disp|#exportrate}
+!SetExportFrequency={Space|Fibers|phi|-1}
+
+% --- Expressions ------------------------------------------------------
+% Material Parameters
+!DefExpression={passive_scale_expr}
+  1 
+
+!DefExpression={mat_params_expr}
+  10.0200 *  #kb                          % b1
+  1.1580  *  #kb                          % b2
+  1.64    *  #k  *  passive_scale_expr    % bff
+  0.897   *  #k  *  passive_scale_expr    % bss
+  0.409   *  #k  *  passive_scale_expr    % bnn
+  6.175   *  #k  *  passive_scale_expr    % bfs
+  3.52    *  #k  *  passive_scale_expr    % bfn
+  2.895   *  #k  *  passive_scale_expr    % bns
+
+!DefExpression={nh_param}
+  0.416 * #k * passive_scale_expr
+
+%  ---  Problem Definition  --------------------------------------------
+!DefProblem={solid|STEADY_QUASI_STATIC_ELASTICITY}
+  !UseVariablePointer={Space|Space}
+  !UseVariablePointer={Displacement|Disp}
+  !UseVariablePointer={Fibers|Fibers}
+  !SetRootTopology={TP1}
+
+% --- Active/passive laws ---------------------------------------------
+  !ConstitutiveLaw={doubleE}
+    mat_params_expr
+  !ConstitutiveLaw={compressible}
+  100 100
+  !ConstitutiveLaw={neohookean}
+    nh_param
+
+  % --- Boundary conditions --------------------------------------------
+  !Boundary-patch-definitions
+    4       Disp  DIRICHLET        0. 0. 0.
+    5       Disp  DIRICHLET        0. 0. 0.
+    6       Disp  DIRICHLET        0. 0. 0.
+    7       Disp  DIRICHLET        0. 0. 0.
+
+
+%  ---  Include Problems   --------------------------------------------
+!include={problem_volume.P}

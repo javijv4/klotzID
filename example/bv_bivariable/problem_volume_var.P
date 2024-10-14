@@ -1,0 +1,98 @@
+
+
+% --- Solver Definition ----------------------------------------------
+!SetSolverGroup={SG1|AddVariables|LV_Vol|LV_LM|RV_Vol|RV_LM}
+
+
+% --- Basis function definition --------------------------------------
+!UseBasis={LinSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS6}
+
+
+% --- Topology -------------------------------------------------------
+!DefTopology={TP1endo_lv | #meshdir/lv_model_endo  | LinSurfBasis}
+  !SetTopology={TP1endo_lv|CreateInBoundary|[TP1;#lv_endo]}
+!DefTopology={TP1endo_rv | #meshdir/rv_model_endo  | LinSurfBasis}
+  !SetTopology={TP1endo_rv|CreateInBoundary|[TP1;#rv_endo]}
+
+
+% --- Interfaces -----------------------------------------------------
+!DefInterface={ManyToOne|TP1endo_lv|TP1|#meshdir/TP1endo-TP1_lv_solid.IN|NestedInBndry[#lv_endo]}
+!DefInterface={ManyToOne|TP1endo_rv|TP1|#meshdir/TP1endo-TP1_rv_solid.IN|NestedInBndry[#rv_endo]}
+
+
+% --- Variables ------------------------------------------------------
+!DefVariablePointer={LV_LM|null_topology|1}
+  !SetVariablePointer={LV_LM|TEMPORAL_UPDATE_EXPR|pexpr_lv|1}
+!DefVariablePointer={LV_Vol|null_topology|1}
+  !SetVariablePointer={LV_Vol|TEMPORAL_UPDATE_EXPR|vexpr_lv|1}
+!DefVariablePointer={RV_LM|null_topology|1}
+  !SetVariablePointer={RV_LM|TEMPORAL_UPDATE_EXPR|pexpr_rv|1}
+!DefVariablePointer={RV_Vol|null_topology|1}
+  !SetVariablePointer={RV_Vol|TEMPORAL_UPDATE_EXPR|vexpr_rv|1}
+
+!DefVariablePointer={N3_LV | null_topology | #datadir/N3_lv.D | 3}
+!DefVariablePointer={N3_RV | null_topology | #datadir/N3_rv.D | 3}
+
+!SetExportFrequency={LV_LM|LV_Vol|RV_LM|RV_Vol|1}
+!SetExportFrequency={N3_LV|N3_RV|0}
+
+
+% --- Expressions ------------------------------------------------------
+% Pressure and volume
+!DefExpression={vexpr_lv}
+  (#LV_EDV - #LV_V0)*t + #LV_V0
+
+!DefExpression={vexpr_rv}
+  (#RV_EDV - #RV_V0)*t + #RV_V0
+
+
+% Expression to calculate the volume in this region
+!DefExpression={mat_expr_lv}
+    ( N3_LV.1 * N3_LV.1)
+    ( N3_LV.1 * N3_LV.2)
+    ( N3_LV.1 * N3_LV.3)
+    ( N3_LV.2 * N3_LV.1)
+    ( N3_LV.2 * N3_LV.2)
+    ( N3_LV.2 * N3_LV.3)
+    ( N3_LV.3 * N3_LV.1)
+    ( N3_LV.3 * N3_LV.2)
+    ( N3_LV.3 * N3_LV.3)
+
+!DefExpression={mat_expr_rv}
+    ( N3_RV.1 * N3_RV.1)
+    ( N3_RV.1 * N3_RV.2)
+    ( N3_RV.1 * N3_RV.3)
+    ( N3_RV.2 * N3_RV.1)
+    ( N3_RV.2 * N3_RV.2)
+    ( N3_RV.2 * N3_RV.3)
+    ( N3_RV.3 * N3_RV.1)
+    ( N3_RV.3 * N3_RV.2)
+    ( N3_RV.3 * N3_RV.3)
+
+
+% ----  Volume constrain  ---------------------------------------------------------
+!DefProblem={lvendo|fscoupling_problem}
+  !UseVariablePointer={Space|Space}
+  !AddTerms={TestVariable[Disp]| par_LV[v0]}
+  !Addterms
+     TestVariable[par_LV*]
+     Disp[trace;mat_expr_lv]  Space[trace;mat_expr_lv]   vexpr_lv[1;flux]
+  !Boundary-conditions-not-required
+  !SetRootTopology={TP1endo_lv}
+  !SetPerturbationBuild
+
+!DefProblem={rvendo|fscoupling_problem}
+  !UseVariablePointer={Space|Space}
+  !AddTerms={TestVariable[Disp]| par_RV[v0]}
+  !Addterms
+     TestVariable[par_RV*]
+     Disp[trace;mat_expr_rv]  Space[trace;mat_expr_rv]   vexpr_rv[1;flux]
+  !Boundary-conditions-not-required
+  !SetRootTopology={TP1endo_rv}
+  !SetPerturbationBuild
+
+
+!DefExpression={v0}
+   0
+   0
+   0

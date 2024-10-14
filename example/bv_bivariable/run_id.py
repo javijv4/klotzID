@@ -12,9 +12,9 @@ ncores = 8                              # WARNING!!! The program uses (ncores x 
 out_fldr = 'mesh/out'                   # Output folder
 out_fname = 'mesh/optimize_params.P'    # Final parameters will be saved in this file
 inflation_type = 'volume_bivariable'               # Method: "volume" or "inverse_volume"
-pfile = 'biv_volume_inflation.P'      # P-file
-pfile_bv = 'biv_bivariable_inflation.P'      # P-file
-pfile_bv_init = 'biv_bivariable_inflation_runinit.P'      # P-file
+pfile = 'bv_volume_fwd.P'      # P-file
+pfile_bv = 'bv_volume_var.P'      # P-file
+pfile_bv_init = 'bv_volume_var_init.P'      # P-file
 
 pressure_var = 'LV_LM'                  # Name of CH pressure variable
 volume_var = 'LV_Vol'                   # Name of CH volume variable
@@ -26,18 +26,18 @@ times = (1,100,1)                       # Time at which pressure_var and volume_
 
 
 
-# ED values, left ventricle
-ed_pressure = 2.464647104639350 # kPa
-ed_volume = 188990.934787700913148  # mm3
+# ED values, left ventricle - with MR
+ed_pressure = 2.436643694111780 # kPa
+ed_volume = 218836.974822676467 # mm^3
 
 # Right ventricle
-ed_pres_rv=1.247110238886919
-ed_vol_rv=248863.804719955543987
+ed_pres_rv= 1.830292960298873
+ed_vol_rv= 239318.760572780860
 
 
 # Initial guess
 k0 = 1.0
-kb0 = 1.0
+kb0 = 0.1
 
 par_lv=0
 par_rv=0
@@ -55,7 +55,7 @@ klotzopt = KlotzID(pfile, pressure_var, volume_var, out_fldr, times,
                    plot_intermediate=True,      # Save a png of the pressure volume curve every iteration
                    save_intermediate=True)      # Save intermediate pressure, volume and parameters in an .npz file
                    
-klotzopt.max_iterations = 40                    # Setting max number of iterations
+klotzopt.max_iterations = 20                    # Setting max number of iterations
 params = klotzopt.optimize(params0)
 klotzopt.run_last_simulation(params)
 klotzopt.write_params(out_fname, params)

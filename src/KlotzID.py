@@ -101,6 +101,7 @@ class KlotzID:
         self.intermediate = {'vol': [], 'pres': [], 'params': []}
 
         self.logfile = 'klotzid.log'
+        self.inflate_file='inflate_values.P'
 
 
     def prepare(self):
@@ -117,6 +118,20 @@ class KlotzID:
             os.remove(self.logfile)
         except OSError:
             pass
+
+        # Removing old inflate value file
+        try:
+            os.remove(self.logfile)
+        except OSError:
+            pass
+
+        # write values to new inflate value file
+        inf_file=open(self.inflate_file,"w")
+        inf_file.write("#LV_EDP="+str(self.lv_ed_pressure)+'\n')
+        inf_file.write("#LV_EDV="+str(self.lv_ed_volume)+'\n')
+        inf_file.write("#RV_EDP="+str(self.rv_ed_pressure)+'\n')
+        inf_file.write("#RV_EDV="+str(self.rv_ed_volume)+'\n')
+        inf_file.close()
 
 
     def post_clean(self):
