@@ -22,7 +22,7 @@ class KlotzID:
                  inflation_type, ncores,
                  rv_ed_pressure=0.0,rv_ed_volume=0.0,
                  constraint_vars=None, pfile_bv_init=None,pfile_bv=None,alternate_export=False,
-                 plot_intermediate=False, save_intermediate=False,use_inflate_pfile=True):
+                 plot_intermediate=False, save_intermediate=False,use_inflate_pfile=False):
         self.self_path = os.path.dirname(os.path.abspath(__file__))
         self.cheart_folder = os.path.dirname(pfile)
         if self.cheart_folder == '': self.cheart_folder = '.'
