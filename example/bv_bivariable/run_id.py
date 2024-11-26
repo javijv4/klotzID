@@ -42,7 +42,7 @@ kb0 = .496598
 par_lv=0
 par_rv=0
 
-params0 = (k0, kb0,par_lv,par_rv)
+params0 = (k0, kb0, par_lv, par_rv)
 
 # Optimization
 klotzopt = KlotzID(pfile, pressure_var, volume_var, out_fldr, times, 

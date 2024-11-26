@@ -3,7 +3,7 @@
 % The result should be similar as creating a cap in the valves and computing the
 % enclosed volume.
 
-!include={boundaries.P}
+!include={boundaries.P}  % This is a file that contains the patches information
 !SetOutputPath={#meshdir}
 % --- Solver Definition ----------------------------------------------
 !DefSolverGroup={INFLATION|null|lv_vol_calc|rv_vol_calc}
