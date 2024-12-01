@@ -1,0 +1,170 @@
+% Receives #k, #kb, #outdir
+% ----    General stuff   -----------------------------------------------------------------
+#meshdir=#path_to_mesh_fldr
+#datadir=#path_to_data_fldr
+
+!SetOutputPath={#outdir}  % CH-command to set where the results will be saved
+
+% Mesh volumes -> This comes from cheart_volume_calc
+#LV_V0=82889.047255798709   
+#RV_V0=92392.942933852479   
+
+% ED volumes and pressures.
+#LV_EDP=1.066578496177649
+#LV_EDV=208840.709964924666565
+
+#RV_EDP=0.533289248088825
+#RV_EDV=196409.607383761554956
+
+% time scheme
+#st=1
+#et=100
+#dt=0.01
+
+% Boundary patches. Change this!!
+#lv_endo = 1
+#rv_endo = 2
+
+% --- Solver Definition ---------------------------------------------
+!DefSolverGroup={SG1|TimeStepping|Matrix}
+  !DefSolverSubGroup={SG1|SEQ_FP_LINESEARCH|Matrix|ScaleFirstResidual[1000]}
+  !SetSolverGroup={SG1|L2TOL|1e-8}
+  !SetSolverGroup={SG1|ITERATION|30}
+  !SetSolverGroup={SG1|LINESEARCHITER|10} 
+
+!DefSolverMatrix={Matrix|SOLVER_MUMPS|solid|lvendo|rvendo}
+  !SetSolverMatrix={Matrix |ordering      |parallel}
+  !SetSolverMatrix={Matrix | SolverMatrixCalculation | evaluate_every_build}
+
+!DefTimeStepScheme={TimeStepping}
+   #st   #et   #dt
+
+
+
+% --- Basis function definition --------------------------------------
+!UseBasis={LinBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS6}
+!UseBasis={LinSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE1|KEAST_LYNESS6}
+!UseBasis={ConstBasis|TETRAHEDRAL_ELEMENT|NODAL_LAGRANGE0|KEAST_LYNESS6}
+!UseBasis={ConstSurfBasis|TRIANGLE_ELEMENT|NODAL_LAGRANGE0|KEAST_LYNESS6}
+
+
+% --- Topology -------------------------------------------------------
+!DefTopology={TP1 | #meshdir/bv_model | LinBasis}
+!DefTopology={TPfibers | #meshdir/fiber | LinBasis}
+
+!DefTopology={TP_lvendo | #meshdir/lv_endo_lin | LinSurfBasis}
+  !SetTopology={TP_lvendo | CreateInBoundary | [TP1;#lv_endo]}
+!DefTopology={TP_rvendo | #meshdir/rv_endo_lin | LinSurfBasis}
+  !SetTopology={TP_rvendo | CreateInBoundary | [TP1;#rv_endo]}
+
+
+% -- Interfaces -----------------------------------------------------
+!DefInterface={OneToOne|TP1|TPfibers}
+!DefInterface={ManyToOne|TP_lvendo|TP1|#meshdir/lvendo-bvmodel.IN}
+!DefInterface={ManyToOne|TP_rvendo|TP1|#meshdir/rvendo-bvmodel.IN}
+
+
+% --- Variables ------------------------------------------------------
+!DefVariablePointer={Space| TP1 | #meshdir/bv_model | 3}
+!DefVariablePointer={Disp| TP1 | 3}
+!DefVariablePointer={Pres| TP1 | 1}
+!DefVariablePointer={Fibers| TPfibers | #datadir/fiber.field|9}
+
+% Lagrange multipliers (pressures)
+!DefVariablePointer={LV_LM | null_topology | 1}
+!DefVariablePointer={RV_LM | null_topology | 1}
+
+% N3 vectors
+!DefVariablePointer={N3_LV | null_topology | #meshdir/N3_lv.FE | 3}
+!DefVariablePointer={N3_RV | null_topology | #meshdir/N3_rv.FE | 3}
+
+% Dummy variables to export volume
+!DefVariablePointer={LV_Vol | null_topology | 1}
+  !SetVariablePointer={LV_Vol | temporal_update_expr | lv_vol_expr | 1}
+
+!DefVariablePointer={RV_Vol | null_topology | 1}
+  !SetVariablePointer={RV_Vol | temporal_update_expr | rv_vol_expr | 1}
+
+
+% --- Other -----------------------------------------------------------
+!SetExportFrequency={Disp|Pres|1}
+!SetExportFrequency={Fibers|Space|X0|0}
+
+
+% --- Expressions ----------------------------------------------------
+!DefExpression={lv_vol_expr}
+  #LV_EDV - (#LV_EDV  - #LV_V0) * t 
+
+!DefExpression={rv_vol_expr}
+  #RV_EDV - (#RV_EDV - #RV_V0) * t
+
+!DefExpression={mat_params_expr}
+  10.0200 * #k       %b1
+  1.1580  * #k       %b2
+  1.64    * #kb      %bff
+  0.897   * #kb      %bss
+  0.409   * #kb      %bnn
+  6.175   * #kb      %bfs
+  3.52    * #kb      %bfn
+  2.895   * #kb      %bns
+
+
+% Expression to calculate the volume in this region
+!DefExpression={lv_mat_expr}
+    ( N3_LV.1 * N3_LV.1)
+    ( N3_LV.1 * N3_LV.2)
+    ( N3_LV.1 * N3_LV.3)
+    ( N3_LV.2 * N3_LV.1)
+    ( N3_LV.2 * N3_LV.2)
+    ( N3_LV.2 * N3_LV.3)
+    ( N3_LV.3 * N3_LV.1)
+    ( N3_LV.3 * N3_LV.2)
+    ( N3_LV.3 * N3_LV.3)
+
+!DefExpression={rv_mat_expr}
+    ( N3_RV.1 * N3_RV.1)
+    ( N3_RV.1 * N3_RV.2)
+    ( N3_RV.1 * N3_RV.3)
+    ( N3_RV.2 * N3_RV.1)
+    ( N3_RV.2 * N3_RV.2)
+    ( N3_RV.2 * N3_RV.3)
+    ( N3_RV.3 * N3_RV.1)
+    ( N3_RV.3 * N3_RV.2)
+    ( N3_RV.3 * N3_RV.3)
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  ---  Problem Definition  -------------------------------------------
+ !DefProblem={solid|STEADY_QUASI_STATIC_ELASTICITY}
+   !UseVariablePointer={Space|Space}
+   !UseVariablePointer={Displacement|Disp}
+   !UseVariablePointer={Pressure|Pres}
+   !UseVariablePointer={Fibers|Fibers}
+   !ConstitutiveLaw={doubleE}
+       mat_params_expr
+   !Nearly-incompressible={#BM}
+  !Boundary-patch-definitions
+    #mv  Disp  dirichlet  0 0 0
+    #av  Disp  dirichlet  0 0 0
+    #tv  Disp  dirichlet  0 0 0
+    #pv  Disp  dirichlet  0 0 0
+
+
+%  ---  Problem Definition  -------------------------------------------
+!DefProblem={lvendo|fscoupling_problem}
+    !UseVariablePointer={Space|Space}
+    !AddTerms={TestVariable[Disp]| LV_LM[trace]}
+    !Addterms
+      TestVariable[LV_LM*]
+      Disp[trace;lv_mat_expr]  Space[trace;lv_mat_expr]   LV_Vol_expr[1;flux]
+    !Boundary-conditions-not-required
+    !SetRootTopology={TP_lvendo}
+
+!DefProblem={rvendo|fscoupling_problem}
+    !UseVariablePointer={Space|Space}
+    !AddTerms={TestVariable[Disp]| RV_LM[trace]}
+    !Addterms
+      TestVariable[RV_LM*]
+      Disp[trace;rv_mat_expr]  Space[trace;rv_mat_expr]   RV_Vol_expr[1;flux]
+    !Boundary-conditions-not-required
+    !SetRootTopology={TP_rvendo}
