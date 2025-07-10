@@ -17,10 +17,10 @@ import time
 
 
 class KlotzID:
-    def __init__(self, pfile, pressure_var, volume_var, out_fldr, sim_times, 
-                 lv_ed_pressure, lv_ed_volume, 
-                 inflation_type, ncores,
-                 rv_ed_pressure=0.0,rv_ed_volume=0.0,
+    def __init__(self, pfile, pressure_var, volume_var, sim_folder, sim_times, 
+                 lv_ed_pressure, lv_ed_volume, lv_v0, 
+                 inflation_type, ncores, meshdir, datadir,
+                 rv_ed_pressure=0.0, rv_ed_volume=0.0, rv_v0=0.0, 
                  constraint_vars=None, pfile_bv_init=None,pfile_bv=None,alternate_export=False,
                  plot_intermediate=False, save_intermediate=False,use_inflate_pfile=False):
         self.self_path = os.path.dirname(os.path.abspath(__file__))
@@ -45,6 +45,7 @@ class KlotzID:
             self.pfile_bv = pfile_bv
             self.rv_ed_pressure = rv_ed_pressure
             self.rv_ed_volume = rv_ed_volume
+            self.rv_v0 = rv_v0
             if constraint_vars is None:
                 raise ValueError("For bivariable inflation, constraint variables must be provided")
             if len(constraint_vars) != 2:
@@ -63,6 +64,7 @@ class KlotzID:
             self.pfile_bv = pfile_bv
             self.rv_ed_pressure = rv_ed_pressure
             self.rv_ed_volume = rv_ed_volume
+            self.rv_v0 = rv_v0
             if len(constraint_vars) != 1:
                 raise ValueError("For variable inflation, one constraint variable must be provided")
             self.pars=constraint_vars
@@ -71,9 +73,11 @@ class KlotzID:
 
 
         # Output path
-        self.out_fldr = out_fldr
-        if not os.path.exists('{}/{}'.format(self.cheart_folder, out_fldr)):
-            os.mkdir('{}/{}'.format(self.cheart_folder, out_fldr))
+        self.sim_folder = sim_folder
+        if not os.path.exists('{}'.format(sim_folder)):
+            os.mkdir('{}'.format(sim_folder))
+        self.meshdir = meshdir
+        self.datadir = datadir
 
         self.pressure_var = pressure_var
         self.volume_var = volume_var
@@ -84,6 +88,7 @@ class KlotzID:
         # Compute target curve
         self.lv_ed_pressure = lv_ed_pressure  # kPa
         self.lv_ed_volume = lv_ed_volume # mm3
+        self.lv_v0 = lv_v0 # mm3
         self.klotz_volume, self.klotz_pressure = klotz_curve(lv_ed_volume, lv_ed_pressure)
         self.klotz_function = interp1d(self.klotz_volume, self.klotz_pressure, fill_value='extrapolate')
 
@@ -108,12 +113,12 @@ class KlotzID:
 
     def prepare(self):
         # Creating folders
-        if not os.path.exists('{}/tmp1'.format(self.cheart_folder)):
-            os.mkdir('{}/tmp1'.format(self.cheart_folder))
-        if not os.path.exists('{}/tmp2'.format(self.cheart_folder)):
-            os.mkdir('{}/tmp2'.format(self.cheart_folder))
-        if not os.path.exists('{}/tmp3'.format(self.cheart_folder)):
-            os.mkdir('{}/tmp3'.format(self.cheart_folder))
+        if not os.path.exists('{}/tmp1'.format(self.sim_folder)):
+            os.mkdir('{}/tmp1'.format(self.sim_folder))
+        if not os.path.exists('{}/tmp2'.format(self.sim_folder)):
+            os.mkdir('{}/tmp2'.format(self.sim_folder))
+        if not os.path.exists('{}/tmp3'.format(self.sim_folder)):
+            os.mkdir('{}/tmp3'.format(self.sim_folder))
 
         # Deleting log
         try:
@@ -141,9 +146,9 @@ class KlotzID:
 
     def post_clean(self):
         # Deleting temporaty folders.
-        shutil.rmtree('{}/tmp1'.format(self.cheart_folder))
-        shutil.rmtree('{}/tmp2'.format(self.cheart_folder))
-        shutil.rmtree('{}/tmp3'.format(self.cheart_folder))
+        shutil.rmtree('{}/tmp1'.format(self.sim_folder))
+        shutil.rmtree('{}/tmp2'.format(self.sim_folder))
+        shutil.rmtree('{}/tmp3'.format(self.sim_folder))
         os.remove('tmp1.log')
         os.remove('tmp2.log')
         os.remove('tmp3.log')
@@ -189,12 +194,12 @@ class KlotzID:
         if self.inflation_type=='volume_bivariable':
             k, kb, par_lv, par_rv = params
             print('Running variable inflation with optimized parameters k={:f} and kb={:f}'.format(k, kb))
-            p_bv = self.run_cheart_variable_inflation(params,'tmp3') #uses new k and kb
+            p_bv = self.run_cheart_variable_inflation(params,f'{self.sim_folder}/tmp3') #uses new k and kb
             p_bv.wait()
 
             times = (self.times[1], self.times[1], self.times[2])
-            par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[0]), times)[-1]
-            par_rv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[1]), times)[-1]
+            par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp3', self.pars[0]), times)[-1]
+            par_rv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp3', self.pars[1]), times)[-1]
             print('Variable inflation found par_lv={:f} and par_rv={:f}'.format(par_lv, par_rv))
 
             params = (k, kb, par_lv, par_rv)
@@ -222,7 +227,7 @@ class KlotzID:
                 print('Type error in saving intermediates!')
                 int_params=np.array([0,0,0,0])
 
-            np.savez('{}/{}/intermediate_results.npz'.format(self.cheart_folder, self.out_fldr), volume=int_vol, pressure=int_pres, params=int_params)
+            np.savez('{}/intermediate_results.npz'.format(self.sim_folder), volume=int_vol, pressure=int_pres, params=int_params)
 
         print()
 
@@ -265,9 +270,9 @@ class KlotzID:
         exit_codes = [p.wait() for p in (p1, p2)]
 
         # Load results
-        pres = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp1', self.pressure_var), self.times)
-        vol = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp1', self.volume_var), self.times)
-        pres_eps = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp2', self.pressure_var), self.times)
+        pres = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp1', self.pressure_var), self.times)
+        vol = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp1', self.volume_var), self.times)
+        pres_eps = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp2', self.pressure_var), self.times)
 
         if self.inflation_type == 'inverse_volume':
             vol = vol[::-1]
@@ -276,7 +281,7 @@ class KlotzID:
             pres_eps = np.append(0., pres_eps)
 
         if self.plot_intermediate:
-            self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.cheart_folder, self.out_fldr, self.it), vol, pres, (k, kb, par_lv, par_rv))
+            self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.sim_folder, self.sim_folder, self.it), vol, pres, (k, kb, par_lv, par_rv))
 
         if self.save_intermediate:
             self.intermediate['vol'].append(vol)
@@ -318,16 +323,16 @@ class KlotzID:
         else:
             raise ValueError('This function is only for variable inflation')
 
-        p_bv = self.run_cheart_variable_inflation(params,'tmp3') #uses new k and kb
+        p_bv = self.run_cheart_variable_inflation(params,f'{self.sim_folder}/tmp3') #uses new k and kb
         exit_code_bv = [p.wait() for p in ([p_bv])]
 
         times = (self.times[1], self.times[1], self.times[2])
 
         try:
-            par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[0]), times)[-1]
+            par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp3', self.pars[0]), times)[-1]
 
             if self.inflation_type == 'volume_bivariable':
-                par_rv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, 'tmp3', self.pars[1]), times)[-1]
+                par_rv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp3', self.pars[1]), times)[-1]
                 params_full=(k, kb, par_lv, par_rv)
                 print('Variable inflation found par_lv={:f} and par_rv={:f}'.format(par_lv, par_rv))
             else:
@@ -392,12 +397,12 @@ class KlotzID:
             par_rv=0
 
         print('Running simulation with optimized parameters k={:f}, kb={:f}, par_lv={:f}, par_rv={:f}.'.format(k, kb, par_lv, par_rv))
-        p1 = self.run_cheart_inflation((k, kb, par_lv, par_rv), self.out_fldr)
+        p1 = self.run_cheart_inflation((k, kb, par_lv, par_rv), self.sim_folder)
         p1.wait()
 
         # Load results
-        pres = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, self.out_fldr, self.pressure_var), self.times)
-        vol = chio.read_scalar_dfiles('{}/{}/{}'.format(self.cheart_folder, self.out_fldr, self.volume_var), self.times)
+        pres = chio.read_scalar_dfiles('{}/{}'.format(self.sim_folder, self.pressure_var), self.times)
+        vol = chio.read_scalar_dfiles('{}/{}'.format(self.sim_folder, self.volume_var), self.times)
 
         if self.inflation_type == 'inverse_volume':
             vol = vol[::-1]
@@ -410,7 +415,7 @@ class KlotzID:
         curve_error = np.linalg.norm(g)
 
         if plot:
-            self.plot_inflation_curve('{}/{}/klotz_fit.png'.format(self.cheart_folder, self.out_fldr), vol, pres, (k, kb, par_lv, par_rv))
+            self.plot_inflation_curve('{}/klotz_fit.png'.format(self.sim_folder), vol, pres, (k, kb, par_lv, par_rv))
         print('Final simulation results: ED error = {:f}, curve error {:f}'.format(ed_error, curve_error))
 
 
@@ -495,9 +500,20 @@ class KlotzID:
 
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
-            p = Popen(['bash', '{}/run_inflation.sh'.format(self.self_path), '{:f}'.format(k), '{:f}'.format(kb),
-                       '{:f}'.format(par_lv),'{:f}'.format(par_rv),
-                       outdir, '{:d}'.format(self.ncores), self.cheart_folder, self.pfile,'{:f}'.format(self.lv_ed_volume)],
+            p = Popen(['bash', '{}/run_inflation.sh'.format(self.self_path), 
+                       '{:f}'.format(k),                    # 1    
+                       '{:f}'.format(kb),                   # 2
+                       '{:f}'.format(par_lv),               # 3
+                       '{:f}'.format(par_rv),               # 4
+                       outdir,                              # 5   
+                       '{:d}'.format(self.ncores),          # 6
+                       self.cheart_folder,                  # 7
+                       self.pfile,                          # 8  
+                       '{:f}'.format(self.lv_ed_volume),    # 9
+                       '{:f}'.format(self.rv_ed_volume),    # 10
+                       '{:f}'.format(self.lv_v0),           # 11
+                       '{:f}'.format(self.rv_v0),           # 12
+                       self.meshdir, self.datadir,],        # 13, 14
                        stdout=ofile, stderr=ofile)
 
         return p
@@ -509,11 +525,22 @@ class KlotzID:
         # Run cheart
         with open('{}.log'.format(outdir), 'w') as ofile:
             p = Popen(['bash', '{}/run_variable_inflation.sh'.format(self.self_path), 
-                      '{:f}'.format(k), '{:f}'.format(kb),
-                       '{:f}'.format(par_lv),'{:f}'.format(par_rv),
-                       outdir, '{:d}'.format(2*self.ncores), self.cheart_folder, self.pfile_bv_init, self.pfile_bv,
-                       '{:f}'.format(self.lv_ed_volume),'{:f}'.format(self.lv_ed_pressure),
-                       '{:f}'.format(self.rv_ed_pressure),'{:f}'.format(self.rv_ed_volume)], 
+                      '{:f}'.format(k),                     # 1
+                      '{:f}'.format(kb),                    # 2 
+                        '{:f}'.format(par_lv),              # 3
+                        '{:f}'.format(par_rv),              # 4 
+                       outdir,                              # 5
+                       '{:d}'.format(2*self.ncores),        # 6
+                       self.cheart_folder,                  # 7
+                       self.pfile_bv_init,                  # 8
+                       self.pfile_bv,                       # 9
+                       '{:f}'.format(self.lv_ed_volume),    #10 
+                       '{:f}'.format(self.lv_ed_pressure),  #11
+                       '{:f}'.format(self.rv_ed_volume),    #12
+                       '{:f}'.format(self.rv_ed_pressure),  #13
+                       '{:f}'.format(self.lv_v0),           #14
+                       '{:f}'.format(self.rv_v0),       #15
+                       self.meshdir, self.datadir,],    # 16, 17
                        stdout=ofile, stderr=ofile)
 
         return p
