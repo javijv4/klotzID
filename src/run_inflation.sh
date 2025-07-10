@@ -15,4 +15,4 @@ meshdir=${13}
 datadir=${14}
 
 cd ${folder}
-mpirun -np ${ncores} cheartsolver.out ${pfile} -\#k=${k} -\#kb=${kb} -\#par_LV=${par_LV} -\#par_RV=${par_RV} -\#lv_edv=${lv_edv} -\#rv_edv=${rv_edv} -\#lv_v0=${rv_v0} -\#lv_v0=${rv_v0} -\#outdir=${outdir} --pedantic-printing
+mpirun -np ${ncores} cheartsolver.out ${pfile} -\#k=${k} -\#kb=${kb} -\#par_LV=${par_LV} -\#par_RV=${par_RV} -\#lv_edv=${lv_edv} -\#rv_edv=${rv_edv} -\#lv_v0=${lv_v0} -\#rv_v0=${rv_v0} -\#outdir=${outdir} -\#meshdir=${meshdir} -\#datadir=${datadir} --pedantic-printing

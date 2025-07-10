@@ -105,7 +105,7 @@ class KlotzID:
         self.save_intermediate = save_intermediate
         self.intermediate = {'vol': [], 'pres': [], 'params': []}
 
-        self.logfile = 'klotzid.log'
+        self.logfile = f'{self.sim_folder}/klotzid.log'
         self.inflate_file='inflate_values.P'
 
         self.use_inflate_pfile=use_inflate_pfile
@@ -149,9 +149,10 @@ class KlotzID:
         shutil.rmtree('{}/tmp1'.format(self.sim_folder))
         shutil.rmtree('{}/tmp2'.format(self.sim_folder))
         shutil.rmtree('{}/tmp3'.format(self.sim_folder))
-        os.remove('tmp1.log')
-        os.remove('tmp2.log')
-        os.remove('tmp3.log')
+        shutil.rmtree('{}/out'.format(self.sim_folder))
+        os.remove(f'{self.sim_folder}/tmp1.log')
+        os.remove(f'{self.sim_folder}/tmp2.log')
+        os.remove(f'{self.sim_folder}/tmp3.log')
 
 
     def optimize(self, params, post_clean=False):
@@ -265,9 +266,15 @@ class KlotzID:
         elif self.inflation_type=='volume_variable':
             print('Variable parameters par_lv='+str(par_lv))
 
-        p1 = self.run_cheart_inflation((k, kb, par_lv, par_rv), 'tmp1')
-        p2 = self.run_cheart_inflation((k, kb+self.eps, par_lv, par_rv), 'tmp2')
+        p1 = self.run_cheart_inflation((k, kb, par_lv, par_rv), f'{self.sim_folder}/tmp1')
+        p2 = self.run_cheart_inflation((k, kb+self.eps, par_lv, par_rv), f'{self.sim_folder}/tmp2')
         exit_codes = [p.wait() for p in (p1, p2)]
+
+        # Check if the simulations were successful
+        check1 = check_simulation_log(f'{self.sim_folder}/tmp1.log')
+        check2 = check_simulation_log(f'{self.sim_folder}/tmp2.log')
+        if not check1 or not check2:
+            raise RuntimeError('Simulation failed. Check the log files for more details.')
 
         # Load results
         pres = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp1', self.pressure_var), self.times)
@@ -281,7 +288,7 @@ class KlotzID:
             pres_eps = np.append(0., pres_eps)
 
         if self.plot_intermediate:
-            self.plot_inflation_curve('{}/{}/klotz_it{:d}.png'.format(self.sim_folder, self.sim_folder, self.it), vol, pres, (k, kb, par_lv, par_rv))
+            self.plot_inflation_curve('{}/klotz_it{:d}.png'.format(self.sim_folder, self.it), vol, pres, (k, kb, par_lv, par_rv))
 
         if self.save_intermediate:
             self.intermediate['vol'].append(vol)
@@ -328,7 +335,8 @@ class KlotzID:
 
         times = (self.times[1], self.times[1], self.times[2])
 
-        try:
+        check = check_simulation_log(f'{self.sim_folder}/tmp3.log')
+        if check:
             par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp3', self.pars[0]), times)[-1]
 
             if self.inflation_type == 'volume_bivariable':
@@ -338,7 +346,7 @@ class KlotzID:
             else:
                 params_full=(k, kb, par_lv)
                 print('Variable inflation found par_lv={:f}'.format(par_lv))
-        except:
+        else:
             print('Variable inflation failed. Keeping previous parameters')
             if self.inflation_type == 'volume_bivariable':
                 params_full=(k, kb, par_lv, par_rv)
@@ -397,7 +405,7 @@ class KlotzID:
             par_rv=0
 
         print('Running simulation with optimized parameters k={:f}, kb={:f}, par_lv={:f}, par_rv={:f}.'.format(k, kb, par_lv, par_rv))
-        p1 = self.run_cheart_inflation((k, kb, par_lv, par_rv), self.sim_folder)
+        p1 = self.run_cheart_inflation((k, kb, par_lv, par_rv), f'{self.sim_folder}/out')
         p1.wait()
 
         # Load results
@@ -589,3 +597,22 @@ def klotz_curve(Vm, Pm, nv=100):  # inputs are in kPa mm3
 
     # Return in mm3, kpa
     return V*1000, P*0.133322
+
+
+def check_simulation_log(log_file):
+    """
+    Check the simulation log file for errors.
+    Returns True if no errors are found, False otherwise.
+    """
+    if not os.path.exists(log_file):
+        raise FileNotFoundError(f"Log file {log_file} does not exist.")
+
+    with open(log_file, 'r') as f:
+        lines = f.readlines()
+    
+    for line in lines[-3:]:
+        if 'Program complete ...' in line:
+            print("Simulation completed successfully.")
+            return True
+    
+    return False
