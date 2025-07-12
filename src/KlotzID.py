@@ -411,8 +411,8 @@ class KlotzID:
         p1.wait()
 
         # Load results
-        pres = chio.read_scalar_dfiles('{}/{}'.format(self.sim_folder, self.pressure_var), self.times)
-        vol = chio.read_scalar_dfiles('{}/{}'.format(self.sim_folder, self.volume_var), self.times)
+        pres = chio.read_scalar_dfiles('{}/out/{}'.format(self.sim_folder, self.pressure_var), self.times)
+        vol = chio.read_scalar_dfiles('{}/out/{}'.format(self.sim_folder, self.volume_var), self.times)
 
         if self.inflation_type == 'inverse_volume':
             vol = vol[::-1]
