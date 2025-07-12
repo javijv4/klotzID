@@ -119,6 +119,8 @@ class KlotzID:
             os.mkdir('{}/tmp2'.format(self.sim_folder))
         if not os.path.exists('{}/tmp3'.format(self.sim_folder)):
             os.mkdir('{}/tmp3'.format(self.sim_folder))
+        if not os.path.exists('{}/out'.format(self.sim_folder)):
+            os.mkdir('{}/out'.format(self.sim_folder))
 
         # Deleting log
         try:
@@ -330,12 +332,12 @@ class KlotzID:
         else:
             raise ValueError('This function is only for variable inflation')
 
+        times = (self.times[1], self.times[1], self.times[2])
+        
         p_bv = self.run_cheart_variable_inflation(params,f'{self.sim_folder}/tmp3') #uses new k and kb
         exit_code_bv = [p.wait() for p in ([p_bv])]
-
-        times = (self.times[1], self.times[1], self.times[2])
-
         check = check_simulation_log(f'{self.sim_folder}/tmp3.log')
+
         if check:
             par_lv = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp3', self.pars[0]), times)[-1]
 
