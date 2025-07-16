@@ -14,3 +14,6 @@ pip install -e .
 
 # Running
 See the example in the example folder. 
+
+# To-do
+* For the bivariable, inflate and then change the stiffness.
