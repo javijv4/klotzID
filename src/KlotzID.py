@@ -272,16 +272,32 @@ class KlotzID:
         p2 = self.run_cheart_inflation((k, kb+self.eps, par_lv, par_rv), f'{self.sim_folder}/tmp2')
         exit_codes = [p.wait() for p in (p1, p2)]
 
-        # Check if the simulations were successful
-        check1 = check_simulation_log(f'{self.sim_folder}/tmp1.log')
-        check2 = check_simulation_log(f'{self.sim_folder}/tmp2.log')
-        if not check1 or not check2:
+        # A finished log is reported, but a run that wrote most of the curve can still be used.
+        for log_file in (f'{self.sim_folder}/tmp1.log', f'{self.sim_folder}/tmp2.log'):
+            if os.path.exists(log_file):
+                check_simulation_log(log_file)
+
+        # Load results up to the last timestep that exists for every series.
+        pres, _ = read_scalar_dfiles_partial('{}/{}/{}'.format(self.sim_folder, 'tmp1', self.pressure_var), self.times)
+        vol, _ = read_scalar_dfiles_partial('{}/{}/{}'.format(self.sim_folder, 'tmp1', self.volume_var), self.times)
+        pres_eps, _ = read_scalar_dfiles_partial('{}/{}/{}'.format(self.sim_folder, 'tmp2', self.pressure_var), self.times)
+
+        st, et, inc = self.times
+        n_expected = len(range(st, et + 1, inc))
+        n_common = min(len(pres), len(vol), len(pres_eps))
+        incomplete = n_common < n_expected
+        if incomplete and self.inflation_type == 'inverse_volume':
+            raise RuntimeError('Simulation failed. Check the log files for more details.')
+        if n_expected == 0 or n_common / n_expected < 0.9:
             raise RuntimeError('Simulation failed. Check the log files for more details.')
 
-        # Load results
-        pres = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp1', self.pressure_var), self.times)
-        vol = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp1', self.volume_var), self.times)
-        pres_eps = chio.read_scalar_dfiles('{}/{}/{}'.format(self.sim_folder, 'tmp2', self.pressure_var), self.times)
+        pres = pres[:n_common]
+        vol = vol[:n_common]
+        pres_eps = pres_eps[:n_common]
+
+        if incomplete:
+            last_step = st + (n_common - 1) * inc
+            print('Using partial EDPVR through step {:d} ({:.0%} of timesteps).'.format(last_step, n_common / n_expected))
 
         if self.inflation_type == 'inverse_volume':
             vol = vol[::-1]
@@ -297,11 +313,16 @@ class KlotzID:
             self.intermediate['pres'].append(pres)
             self.intermediate['params'].append(params)
 
-        # Linear correction
-        k_delta = self.lv_ed_pressure/pres[-1]
+        # Linear correction. A finished run is anchored at end diastole. A partial
+        # run is anchored at the Klotz pressure of the last completed volume.
+        if incomplete:
+            p_ref = self.klotz_function(vol[-1])
+        else:
+            p_ref = self.lv_ed_pressure
+        k_delta = p_ref/pres[-1]
         k = k*k_delta
-        pres = pres*self.lv_ed_pressure/pres[-1]
-        pres_eps = pres_eps*self.lv_ed_pressure/pres_eps[-1]
+        pres = pres*p_ref/pres[-1]
+        pres_eps = pres_eps*p_ref/pres_eps[-1]
 
         # Levenber-marquadt iteration
         g = self.compute_curve_difference(vol, pres)
@@ -599,6 +620,30 @@ def klotz_curve(Vm, Pm, nv=100):  # inputs are in kPa mm3
 
     # Return in mm3, kpa
     return V*1000, P*0.133322
+
+
+def read_scalar_dfiles_partial(path, times):
+    """Read scalar .D files until the first missing timestep.
+
+    Returns the trimmed array and the last timestep that was read.
+    The last timestep is None when no file in the requested range exists.
+    """
+    st, et, inc = times
+    values = []
+    last_step = None
+    for step in range(st, et + 1, inc):
+        fpath = '{}-{:d}.D'.format(path, step)
+        if not os.path.exists(fpath):
+            break
+        try:
+            value = np.squeeze(chio.read_dfile(fpath))
+            if np.shape(value) != () or not np.isfinite(value):
+                break
+        except Exception:
+            break
+        values.append(float(value))
+        last_step = step
+    return np.asarray(values, dtype=float), last_step
 
 
 def check_simulation_log(log_file):
