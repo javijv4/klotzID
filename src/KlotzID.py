@@ -221,8 +221,13 @@ class KlotzID:
             print('Optimization failed.')
 
         if self.save_intermediate:
-            int_vol = np.vstack(self.intermediate['vol'])
-            int_pres = np.vstack(self.intermediate['pres'])
+            # A partial run keeps only the timesteps it finished. Pad the missing
+            # tail with NaN so every iteration has one row of the full length.
+            n_full = len(range(self.times[0], self.times[1] + 1, self.times[2]))
+            if self.inflation_type == 'inverse_volume':
+                n_full += 1
+            int_vol = stack_partial_curves(self.intermediate['vol'], n_full)
+            int_pres = stack_partial_curves(self.intermediate['pres'], n_full)
 
             try:
                 int_params = np.vstack(np.array(self.intermediate['params']))
@@ -620,6 +625,22 @@ def klotz_curve(Vm, Pm, nv=100):  # inputs are in kPa mm3
 
     # Return in mm3, kpa
     return V*1000, P*0.133322
+
+
+def stack_partial_curves(curves, n_full):
+    """Stack curves, padding timesteps that a partial run did not finish.
+
+    Missing values are NaN and sit at the end, which is where a stopped
+    simulation leaves a gap.
+    """
+    rows = [np.atleast_1d(np.asarray(curve, dtype=float)) for curve in curves]
+    length = max([n_full] + [row.shape[0] for row in rows])
+    padded = []
+    for row in rows:
+        if row.shape[0] < length:
+            row = np.pad(row, (0, length - row.shape[0]), constant_values=np.nan)
+        padded.append(row)
+    return np.vstack(padded)
 
 
 def read_scalar_dfiles_partial(path, times):
